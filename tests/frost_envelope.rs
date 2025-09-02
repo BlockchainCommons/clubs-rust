@@ -1,9 +1,8 @@
 use std::collections::BTreeMap;
 
-use bc_components::{DigestProvider, SchnorrPublicKey, Signature, SigningPublicKey, Verifier};
+use bc_components::{DigestProvider, SchnorrPublicKey, Signature, SigningPublicKey};
 use bc_envelope::prelude::*;
 use frost_secp256k1_tr as frost;
-use frost_secp256k1_tr::Group; // for Group::serialize
 use frost_secp256k1_tr::{
     Identifier,
     keys::{KeyPackage, PublicKeyPackage},
@@ -89,26 +88,41 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     shares.insert(alice_id, alice_share);
     shares.insert(bob_id, bob_share);
 
-    // --- Aggregate the group signature and verify with the group public key (FROST API) ---
-    let group_sig = frost::aggregate(&signing_package, &shares, &public_key_package)
-        .expect("aggregate");
+    // --- Aggregate, attach, and verify via helper ---
+    let (signed_wrapped, signing_key) = aggregate_and_attach_signature(
+        &wrapped,
+        &signing_package,
+        &shares,
+        &public_key_package,
+        message,
+    );
+    assert!(signed_wrapped.has_signature_from(&signing_key).unwrap());
+    signed_wrapped.verify_signature_from(&signing_key).unwrap();
+}
 
-    // Third party verifier uses only the group pubkey to check the signature over message
+fn aggregate_and_attach_signature(
+    wrapped: &Envelope,
+    signing_package: &frost::SigningPackage,
+    shares: &BTreeMap<Identifier, SignatureShare>,
+    public_key_package: &PublicKeyPackage,
+    message: &[u8],
+) -> (Envelope, SigningPublicKey) {
+    // Aggregate and check with FROST verifying key
+    let group_sig = frost::aggregate(signing_package, shares, public_key_package)
+        .expect("aggregate");
     public_key_package
         .verifying_key()
         .verify(message, &group_sig)
         .expect("group signature verifies");
 
-    // --- Convert to bc-components::Signature and attach to the WRAPPED envelope ---
-    // FROST signature should be indistinguishable from a BIP-340 Schnorr signature.
+    // Convert to bc-components::Signature (BIP-340 Schnorr)
     let sig_vec = group_sig.serialize().expect("serialize signature");
     assert_eq!(sig_vec.len(), 64);
     let mut sig_bytes = [0u8; 64];
     sig_bytes.copy_from_slice(&sig_vec);
     let signature = Signature::schnorr_from_data(sig_bytes);
 
-    // Convert the FROST group public key to a Schnorr x-only pubkey (32 bytes)
-    // Serialize group public key (compressed SEC1 33 bytes) via the verifying key API
+    // Convert group pubkey to x-only Schnorr key for bc-components
     let pk_bytes33 = public_key_package
         .verifying_key()
         .serialize()
@@ -119,10 +133,7 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     let schnorr_pk = SchnorrPublicKey::from_data(xonly);
     let signing_key = SigningPublicKey::from_schnorr(schnorr_pk);
 
-    // Attach the signature as an assertion to the WRAPPED envelope
-    let signed_wrapped = wrapped.add_assertion(known_values::SIGNED, signature.clone());
-
-    // Verify using bc-envelope's verification helpers and the group public key
-    assert!(signed_wrapped.has_signature_from(&signing_key).unwrap());
-    signed_wrapped.verify_signature_from(&signing_key).unwrap();
+    // Attach signature to wrapped envelope
+    let signed_wrapped = wrapped.add_assertion(known_values::SIGNED, signature);
+    (signed_wrapped, signing_key)
 }
