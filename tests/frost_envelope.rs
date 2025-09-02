@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use anyhow::{anyhow, bail, Result as AnyResult};
-use bc_components::{DigestProvider, SchnorrPublicKey, Signature, SigningPublicKey};
+use bc_components::{DigestProvider, PrivateKeyBase, SchnorrPublicKey, SigningPublicKey};
 use bc_envelope::prelude::*;
+use clubs::frost::{aggregate_and_attach_signature as agg_attach, FROSTGroup, FrostSigner};
 use frost_secp256k1_tr as frost;
 use frost_secp256k1_tr::{
     Identifier,
@@ -89,62 +89,44 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     shares.insert(alice_id, alice_share);
     shares.insert(bob_id, bob_share);
 
-    // --- Aggregate, attach, and verify via helper ---
-    let (signed_wrapped, signing_key) = aggregate_and_attach_signature(
-        &wrapped,
-        &signing_package,
-        &shares,
-        &public_key_package,
-    )
-    .unwrap();
-    assert!(signed_wrapped.has_signature_from(&signing_key).unwrap());
-    signed_wrapped.verify_signature_from(&signing_key).unwrap();
-}
-
-fn aggregate_and_attach_signature(
-    envelope: &Envelope,
-    signing_package: &frost::SigningPackage,
-    shares: &BTreeMap<Identifier, SignatureShare>,
-    public_key_package: &PublicKeyPackage,
-) -> AnyResult<(Envelope, SigningPublicKey)> {
-    // Aggregate and check with FROST verifying key
-    let group_sig = frost::aggregate(signing_package, shares, public_key_package)
-        .map_err(|e| anyhow!("aggregate group signature failed: {e}"))?;
-    // Derive message to verify from the envelope's subject digest
-    let subject = envelope.subject();
-    let subject_digest = subject.digest();
-    let message: &[u8] = subject_digest.as_ref().as_ref();
-    public_key_package
-        .verifying_key()
-        .verify(message, &group_sig)
-        .map_err(|e| anyhow!("group signature verification failed: {e}"))?;
-
-    // Convert to bc-components::Signature (BIP-340 Schnorr)
-    let sig_vec = group_sig
-        .serialize()
-        .map_err(|e| anyhow!("serialize group signature failed: {e}"))?;
-    if sig_vec.len() != 64 {
-        bail!("unexpected Schnorr signature length: {}", sig_vec.len());
-    }
-    let mut sig_bytes = [0u8; 64];
-    sig_bytes.copy_from_slice(&sig_vec);
-    let signature = Signature::schnorr_from_data(sig_bytes);
-
-    // Convert group pubkey to x-only Schnorr key for bc-components
+    // --- Build Gordian FROSTGroup analog and call the stack-friendly helper ---
+    // Convert group verifying key (33-byte SEC1 -> x-only Schnorr SigningPublicKey)
     let pk_bytes33 = public_key_package
         .verifying_key()
         .serialize()
-        .map_err(|e| anyhow!("serialize group public key failed: {e}"))?;
-    if !(pk_bytes33.len() == 33 && (pk_bytes33[0] == 0x02 || pk_bytes33[0] == 0x03)) {
-        bail!("unexpected group public key format; expected 33-byte compressed SEC1");
-    }
+        .expect("serialize group key");
+    assert!(pk_bytes33.len() == 33 && (pk_bytes33[0] == 0x02 || pk_bytes33[0] == 0x03));
     let mut xonly = [0u8; 32];
     xonly.copy_from_slice(&pk_bytes33[1..]);
     let schnorr_pk = SchnorrPublicKey::from_data(xonly);
     let signing_key = SigningPublicKey::from_schnorr(schnorr_pk);
 
-    // Attach signature assertion to the envelope (signatures are assertions on the subject)
-    let signed = envelope.add_assertion(known_values::SIGNED, signature);
-    println!("{}", signed.format());
-    Ok((signed, signing_key))
+    // Build three local XIDs for Alice, Bob, and Charlie
+    let alice_xid = bc_components::XID::new(
+        PrivateKeyBase::new().schnorr_public_keys().signing_public_key(),
+    );
+    let bob_xid = bc_components::XID::new(
+        PrivateKeyBase::new().schnorr_public_keys().signing_public_key(),
+    );
+    let charlie_xid = bc_components::XID::new(
+        PrivateKeyBase::new().schnorr_public_keys().signing_public_key(),
+    );
+
+    let group = FROSTGroup::new(
+        min_signers as usize,
+        vec![
+            FrostSigner { xid: alice_xid, identifier: 1 },
+            FrostSigner { xid: bob_xid, identifier: 2 },
+            FrostSigner { xid: charlie_xid, identifier: 3 },
+        ],
+        signing_key.clone(),
+    );
+
+    let (signed_wrapped, signing_key) =
+        agg_attach(&wrapped, &group, &signing_package, &shares, &public_key_package)
+            .unwrap();
+    assert!(signed_wrapped.has_signature_from(&signing_key).unwrap());
+    signed_wrapped.verify_signature_from(&signing_key).unwrap();
 }
+
+// (Helper moved into clubs::frost module).
