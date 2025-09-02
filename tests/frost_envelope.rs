@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use anyhow::{anyhow, bail, Result as AnyResult};
 use bc_components::{DigestProvider, SchnorrPublicKey, Signature, SigningPublicKey};
 use bc_envelope::prelude::*;
 use frost_secp256k1_tr as frost;
@@ -42,8 +43,8 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     }
 
     // --- Prepare an Envelope, then WRAP it so the signature covers the whole structure ---
-    let base = Envelope::new("FROST demo: quorum signs this subject")
-        .add_assertion("note", "This is only a demo of FROST signing a wrapped envelope subject digest.");
+    let base = Envelope::new("FROST demo")
+        .add_assertion("note", "This is an assertion on the subject.");
     let wrapped = base.wrap();
     // Subject of `wrapped` is the original envelope; signing covers the wrapped subject digest
     let wrapped_subject = wrapped.subject();
@@ -94,7 +95,8 @@ fn frost_two_of_three_signs_envelope_and_verify() {
         &signing_package,
         &shares,
         &public_key_package,
-    );
+    )
+    .unwrap();
     assert!(signed_wrapped.has_signature_from(&signing_key).unwrap());
     signed_wrapped.verify_signature_from(&signing_key).unwrap();
 }
@@ -104,10 +106,10 @@ fn aggregate_and_attach_signature(
     signing_package: &frost::SigningPackage,
     shares: &BTreeMap<Identifier, SignatureShare>,
     public_key_package: &PublicKeyPackage,
-) -> (Envelope, SigningPublicKey) {
+) -> AnyResult<(Envelope, SigningPublicKey)> {
     // Aggregate and check with FROST verifying key
     let group_sig = frost::aggregate(signing_package, shares, public_key_package)
-        .expect("aggregate");
+        .map_err(|e| anyhow!("aggregate group signature failed: {e}"))?;
     // Derive message to verify from the envelope's subject digest
     let subject = envelope.subject();
     let subject_digest = subject.digest();
@@ -115,11 +117,15 @@ fn aggregate_and_attach_signature(
     public_key_package
         .verifying_key()
         .verify(message, &group_sig)
-        .expect("group signature verifies");
+        .map_err(|e| anyhow!("group signature verification failed: {e}"))?;
 
     // Convert to bc-components::Signature (BIP-340 Schnorr)
-    let sig_vec = group_sig.serialize().expect("serialize signature");
-    assert_eq!(sig_vec.len(), 64);
+    let sig_vec = group_sig
+        .serialize()
+        .map_err(|e| anyhow!("serialize group signature failed: {e}"))?;
+    if sig_vec.len() != 64 {
+        bail!("unexpected Schnorr signature length: {}", sig_vec.len());
+    }
     let mut sig_bytes = [0u8; 64];
     sig_bytes.copy_from_slice(&sig_vec);
     let signature = Signature::schnorr_from_data(sig_bytes);
@@ -128,8 +134,10 @@ fn aggregate_and_attach_signature(
     let pk_bytes33 = public_key_package
         .verifying_key()
         .serialize()
-        .expect("serialize group key");
-    assert!(pk_bytes33.len() == 33 && (pk_bytes33[0] == 0x02 || pk_bytes33[0] == 0x03));
+        .map_err(|e| anyhow!("serialize group public key failed: {e}"))?;
+    if !(pk_bytes33.len() == 33 && (pk_bytes33[0] == 0x02 || pk_bytes33[0] == 0x03)) {
+        bail!("unexpected group public key format; expected 33-byte compressed SEC1");
+    }
     let mut xonly = [0u8; 32];
     xonly.copy_from_slice(&pk_bytes33[1..]);
     let schnorr_pk = SchnorrPublicKey::from_data(xonly);
@@ -137,5 +145,6 @@ fn aggregate_and_attach_signature(
 
     // Attach signature assertion to the envelope (signatures are assertions on the subject)
     let signed = envelope.add_assertion(known_values::SIGNED, signature);
-    (signed, signing_key)
+    println!("{}", signed.format());
+    Ok((signed, signing_key))
 }
