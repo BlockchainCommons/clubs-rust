@@ -1,9 +1,12 @@
 use bc_envelope::prelude::*;
-use bc_components::{PrivateKeyBase, PublicKeysProvider, XIDProvider};
+use bc_components::{
+    PrivateKeyBase, PublicKeysProvider, SSKRGroupSpec, SSKRSpec, SymmetricKey,
+    XIDProvider,
+};
 use bc_xid::XIDDocument;
 use clubs::edition::{permit, Edition, PublicKeyPermit};
 use indoc::indoc;
-use known_values::NAME;
+use known_values::{CONTENT, NAME};
 use provenance_mark::{ProvenanceMarkGenerator, ProvenanceMarkResolution};
 
 fn fixed_key(byte: u8) -> PrivateKeyBase { PrivateKeyBase::from_data([byte; 32]) }
@@ -37,16 +40,21 @@ fn basic_scenario_alice_bob_charlie() {
     let provenance = pm_gen.next(date, Some("Club genesis edition"));
 
     // Edition 1: sealed to all three, signed by the club.
-    let edition = Edition::new(club.xid(), provenance, content);
+    let edition = Edition::new(club.xid(), provenance, content.clone());
     let recipients: Vec<PublicKeyPermit> = vec![
         permit::for_member(alice.xid(), &alice_k.public_keys()),
         permit::for_member(bob.xid(), &bob_k.public_keys()),
         permit::for_member(charlie.xid(), &charlie_k.public_keys()),
     ];
-    let (sealed, shares) = edition
-        .seal_with_permits(&recipients, None, &club_k, None)
+    // Combine permits: recipients and SSKR 2-of-3 group
+    let group = SSKRGroupSpec::new(2, 3).unwrap();
+    let spec = SSKRSpec::new(1, vec![group]).unwrap();
+    let (sealed, shares_opt) = edition
+        .seal_with_permits(&recipients, Some(spec), &club_k, None)
         .unwrap();
-    assert!(shares.is_none());
+    let shares = shares_opt.expect("Expected SSKR shares when spec provided");
+    assert_eq!(shares.len(), 1);
+    assert_eq!(shares[0].len(), 3);
 
     // Phase One: print and collect expected text, then replace with assert below.
     // println!("{}", sealed.format());
@@ -109,4 +117,27 @@ fn basic_scenario_alice_bob_charlie() {
     let edition_rt2 = Edition::try_from(roundtrip_env).unwrap();
     // Entire Edition is idempotent and comparable
     assert_eq!(edition_rt, edition_rt2);
+
+    // Member decrypts: Alice unseals and reads content
+    let sealed_messages = sealed.recipients().unwrap();
+    let mut content_key: Option<SymmetricKey> = None;
+    for sm in sealed_messages {
+        if let Ok(plaintext) = sm.decrypt(&alice_k) {
+            let key = SymmetricKey::from_tagged_cbor_data(plaintext).unwrap();
+            content_key = Some(key);
+            break;
+        }
+    }
+    let content_key = content_key.expect("Alice should be able to unwrap content key");
+    let encrypted_content = sealed.object_for_predicate(CONTENT).unwrap();
+    let decrypted_wrapped = encrypted_content.decrypt_subject(&content_key).unwrap();
+    let decrypted_content = decrypted_wrapped.try_unwrap().unwrap();
+    assert!(decrypted_content.is_identical_to(&content));
+
+    // SSKR quorum: combine 2-of-3 shares to recover content
+    let share1 = &shares[0][0];
+    let share2 = &shares[0][1];
+    let recovered_wrapped = Envelope::sskr_join(&[share1, share2]).unwrap();
+    let recovered = recovered_wrapped.try_unwrap().unwrap();
+    assert!(recovered.is_identical_to(&content));
 }
