@@ -6,6 +6,8 @@ use bc_envelope::prelude::*;
 use frost_secp256k1_tr::keys::{PublicKeyPackage as FrostPk, VerifyingShare};
 use frost_secp256k1_tr::round1::{NonceCommitment, SigningCommitments};
 use frost_secp256k1_tr::VerifyingKey;
+use frost_secp256k1_tr::{self as frost, Identifier};
+use rand::rngs::OsRng;
 
 /// A participant in a FROST group: maps an `XID` to a FROST identifier
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -200,4 +202,125 @@ pub fn aggregate_and_attach_signature(
 
     // Use generic attach helper to affix the signature to the envelope and verify via Gordian stack
     attach_preaggregated_signature(envelope, group, &sig_bytes)
+}
+
+/// Dealer/coordinator that manages FROST state using Gordian analogs externally.
+pub struct FrostDealer {
+    threshold: usize,
+    signers: Vec<FrostSigner>,
+    frost_key_packages: BTreeMap<Identifier, frost::keys::KeyPackage>,
+    frost_public_key_package: frost::keys::PublicKeyPackage,
+    group: FROSTGroup,
+    nonces: BTreeMap<u16, frost::round1::SigningNonces>,
+}
+
+impl FrostDealer {
+    pub fn new_trusted_dealer(threshold: usize, signers: Vec<FrostSigner>) -> AnyResult<Self> {
+        let max = signers.len() as u16;
+        let min = threshold as u16;
+        let ids: Vec<Identifier> = signers
+            .iter()
+            .map(|s| Identifier::try_from(s.identifier))
+            .collect::<Result<_, _>>()
+            .map_err(|_| anyhow!("invalid signer identifier"))?;
+
+        let (secret_shares, public_key_package) = frost::keys::generate_with_dealer(
+            max,
+            min,
+            frost::keys::IdentifierList::Custom(&ids),
+            &mut OsRng,
+        )?;
+
+        let mut frost_key_packages = BTreeMap::new();
+        for (id, ss) in &secret_shares {
+            frost_key_packages.insert(*id, frost::keys::KeyPackage::try_from(ss.clone())?);
+        }
+
+        let pubkey_pkg = FrostPublicKeyPackage::from_frost(&public_key_package)?;
+        let group = FROSTGroup::new(threshold, signers.clone(), pubkey_pkg);
+
+        Ok(Self {
+            threshold,
+            signers,
+            frost_key_packages,
+            frost_public_key_package: public_key_package,
+            group,
+            nonces: BTreeMap::new(),
+        })
+    }
+
+    pub fn group(&self) -> &FROSTGroup { &self.group }
+
+    pub fn round1_prepare(
+        &mut self,
+        envelope: &Envelope,
+        signer_ids: &[u16],
+    ) -> AnyResult<FrostSigningPackageG> {
+        // Derive message from envelope subject digest
+        let subj = envelope.subject();
+        let d = subj.digest();
+        let message = d.as_ref().data().to_vec();
+
+        let mut commitments: BTreeMap<u16, FrostSigningCommitmentSec1> = BTreeMap::new();
+        for &sid in signer_ids {
+            let identifier = Identifier::try_from(sid)
+                .map_err(|_| anyhow!("invalid identifier: {}", sid))?;
+            let kp = self
+                .frost_key_packages
+                .get(&identifier)
+                .ok_or_else(|| anyhow!("missing key package for id {}", sid))?;
+            let (nonces, comms) = frost::round1::commit(kp.signing_share(), &mut OsRng);
+            self.nonces.insert(sid, nonces);
+            let hid = comms
+                .hiding()
+                .serialize()
+                .map_err(|e| anyhow!("serialize hiding commitment: {e}"))?;
+            let bind = comms
+                .binding()
+                .serialize()
+                .map_err(|e| anyhow!("serialize binding commitment: {e}"))?;
+            let mut h = [0u8; 33];
+            h.copy_from_slice(&hid);
+            let mut b = [0u8; 33];
+            b.copy_from_slice(&bind);
+            commitments.insert(sid, FrostSigningCommitmentSec1 { hiding: h, binding: b });
+        }
+
+        Ok(FrostSigningPackageG { message, commitments })
+    }
+
+    pub fn round2_sign(
+        &self,
+        signing_pkg: &FrostSigningPackageG,
+        signer_ids: &[u16],
+    ) -> AnyResult<FrostSignatureSharesG> {
+        // Convert commitments to frost SigningPackage
+        let mut frost_commitments: BTreeMap<Identifier, SigningCommitments> = BTreeMap::new();
+        for (&sid, comm) in &signing_pkg.commitments {
+            let id = Identifier::try_from(sid).map_err(|_| anyhow!("invalid id {}", sid))?;
+            let hiding = NonceCommitment::deserialize(&comm.hiding)
+                .map_err(|e| anyhow!("deserialize hiding: {e}"))?;
+            let binding = NonceCommitment::deserialize(&comm.binding)
+                .map_err(|e| anyhow!("deserialize binding: {e}"))?;
+            frost_commitments.insert(id, SigningCommitments::new(hiding, binding));
+        }
+        let frost_sp = frost::SigningPackage::new(frost_commitments, &signing_pkg.message);
+
+        let mut shares: BTreeMap<u16, Vec<u8>> = BTreeMap::new();
+        for &sid in signer_ids {
+            let id = Identifier::try_from(sid).map_err(|_| anyhow!("invalid id {}", sid))?;
+            let kp = self
+                .frost_key_packages
+                .get(&id)
+                .ok_or_else(|| anyhow!("missing key package for id {}", sid))?;
+            let nonces = self
+                .nonces
+                .get(&sid)
+                .ok_or_else(|| anyhow!("missing nonces for id {}", sid))?;
+            let share = frost::round2::sign(&frost_sp, nonces, kp)
+                .map_err(|e| anyhow!("round2 sign failed for {}: {e}", sid))?;
+            shares.insert(sid, share.serialize());
+        }
+        Ok(FrostSignatureSharesG { shares })
+    }
 }
