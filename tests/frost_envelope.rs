@@ -40,7 +40,7 @@ fn frost_two_of_three_signs_envelope_and_verify() {
         let s = participants.get(&xid).unwrap().round2_sign(&group, &signing_package_g).unwrap();
         shares_map.insert(xid, s);
     }
-    let shares_g = FrostSignatureSharesG { shares: shares_map };
+    let shares_g = FrostSignatureSharesG::new(shares_map);
     let (signed_wrapped, signing_key) = agg_attach(&wrapped, &group, &signing_package_g, &shares_g).unwrap();
     assert!(signed_wrapped.has_signature_from(&signing_key).unwrap());
     signed_wrapped.verify_signature_from(&signing_key).unwrap();

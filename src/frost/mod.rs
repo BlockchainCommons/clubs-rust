@@ -14,21 +14,21 @@ use rand::rngs::OsRng;
 /// - `members`: The participants' XIDs (identifiers are internal-only).
 /// - `verifying_key`: Group verifying key (BIP-340 x-only Schnorr).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FrostPublicKeyPackage {
-    pub verifying_key_sec1: [u8; 33],
+struct FrostPublicKeyPackage {
+    verifying_key_sec1: [u8; 33],
     // Map serialized Identifier bytes -> VerifyingShare (SEC1 33 bytes)
-    pub verifying_shares_sec1: BTreeMap<Vec<u8>, [u8; 33]>,
+    verifying_shares_sec1: BTreeMap<Vec<u8>, [u8; 33]>,
 }
 
 impl FrostPublicKeyPackage {
-    pub fn verifying_signing_key(&self) -> SigningPublicKey {
+    fn verifying_signing_key(&self) -> SigningPublicKey {
         let mut xonly = [0u8; 32];
         xonly.copy_from_slice(&self.verifying_key_sec1[1..]);
         let schnorr_pk = bc_components::SchnorrPublicKey::from_data(xonly);
         SigningPublicKey::from_schnorr(schnorr_pk)
     }
 
-    pub fn from_frost(pkg: &frost_secp256k1_tr::keys::PublicKeyPackage) -> AnyResult<Self> {
+    fn from_frost(pkg: &frost_secp256k1_tr::keys::PublicKeyPackage) -> AnyResult<Self> {
         let vkey = pkg
             .verifying_key()
             .serialize()
@@ -51,7 +51,7 @@ impl FrostPublicKeyPackage {
         Ok(Self { verifying_key_sec1, verifying_shares_sec1 })
     }
 
-    pub fn to_frost(&self) -> AnyResult<frost_secp256k1_tr::keys::PublicKeyPackage> {
+    fn to_frost(&self) -> AnyResult<frost_secp256k1_tr::keys::PublicKeyPackage> {
         // Build verifying key
         let verifying_key = VerifyingKey::deserialize(&self.verifying_key_sec1)
             .map_err(|e| anyhow!("deserialize verifying key: {e}"))?;
@@ -74,7 +74,7 @@ impl FrostPublicKeyPackage {
 pub struct FROSTGroup {
     pub threshold: usize,
     pub members: Vec<XID>,
-    pub pubkey_package: FrostPublicKeyPackage,
+    pubkey_package: FrostPublicKeyPackage,
     // Internal: mapping from member XIDs to frost Identifiers
     id_map: BTreeMap<XID, Identifier>,
 }
@@ -172,19 +172,23 @@ pub fn attach_preaggregated_signature(
 // Gordian-level analogs for signing package and signature shares.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrostSigningCommitmentSec1 {
-    pub hiding: [u8; 33],
-    pub binding: [u8; 33],
+    hiding: [u8; 33],
+    binding: [u8; 33],
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrostSigningPackageG {
-    pub message: Vec<u8>,
-    pub commitments: BTreeMap<XID, FrostSigningCommitmentSec1>,
+    message: Vec<u8>,
+    commitments: BTreeMap<XID, FrostSigningCommitmentSec1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrostSignatureSharesG {
-    pub shares: BTreeMap<XID, Vec<u8>>, // serialized scalar shares
+    shares: BTreeMap<XID, Vec<u8>>, // serialized scalar shares
+}
+
+impl FrostSignatureSharesG {
+    pub fn new(shares: BTreeMap<XID, Vec<u8>>) -> Self { Self { shares } }
 }
 
 /// Build a Gordian signing package from an envelope and a set of commitments.
