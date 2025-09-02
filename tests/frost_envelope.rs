@@ -5,9 +5,8 @@ use bc_envelope::prelude::*;
 use clubs::frost::{
     aggregate_and_attach_signature as agg_attach,
     build_signing_package,
-    FrostDealer,
-    FrostSigner,
     FrostSignatureSharesG,
+    FROSTGroup,
 };
 use bc_xid::XIDDocument;
 
@@ -23,28 +22,23 @@ fn frost_two_of_three_signs_envelope_and_verify() {
         .add_assertion("note", "This is an assertion on the subject.");
     let wrapped = base.wrap();
     // --- Build FROSTGroup using Gordian analogs and Trusted Dealer ---
-    let signers = vec![
-        FrostSigner { xid: alice_doc.xid(), identifier: 1 },
-        FrostSigner { xid: bob_doc.xid(), identifier: 2 },
-        FrostSigner { xid: charlie_doc.xid(), identifier: 3 },
-    ];
-    let (dealer, mut participants) = FrostDealer::new_trusted_dealer(2, signers).unwrap();
-    let group = dealer.group().clone();
+    let members = vec![alice_doc.xid(), bob_doc.xid(), charlie_doc.xid()];
+    let (group, mut participants) = FROSTGroup::new_with_trusted_dealer(2, members).unwrap();
 
     // Round-1: each selected participant generates commitments locally
     let mut commitments = BTreeMap::new();
-    for sid in [1u16, 2u16] {
-        let c = participants.get_mut(&sid).unwrap().round1_commit().unwrap();
-        commitments.insert(sid, c);
+    for xid in [alice_doc.xid(), bob_doc.xid()] {
+        let c = participants.get_mut(&xid).unwrap().round1_commit().unwrap();
+        commitments.insert(xid, c);
     }
     // Build signing package from envelope digest and commitments
     let signing_package_g = build_signing_package(&wrapped, commitments);
 
     // Round-2: each selected participant produces their signature share locally
     let mut shares_map = BTreeMap::new();
-    for sid in [1u16, 2u16] {
-        let s = participants.get(&sid).unwrap().round2_sign(&signing_package_g).unwrap();
-        shares_map.insert(sid, s);
+    for xid in [alice_doc.xid(), bob_doc.xid()] {
+        let s = participants.get(&xid).unwrap().round2_sign(&group, &signing_package_g).unwrap();
+        shares_map.insert(xid, s);
     }
     let shares_g = FrostSignatureSharesG { shares: shares_map };
     let (signed_wrapped, signing_key) = agg_attach(&wrapped, &group, &signing_package_g, &shares_g).unwrap();
