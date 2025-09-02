@@ -73,4 +73,37 @@ fn basic_scenario_alice_bob_charlie() {
         ]
     "#}).trim();
     assert_eq!(sealed.format(), expected);
+
+    // Round-trip: convert envelope back to Edition and examine its serialization.
+    let edition_rt = Edition::try_from(sealed.clone()).unwrap();
+    let roundtrip_env: Envelope = edition_rt.clone().into();
+    #[rustfmt::skip]
+    let expected_rt = (indoc! {r#"
+        XID(02dca4b9) [
+            {
+                'hasRecipient': SealedMessage
+            } [
+                'holder': XID(1944dcbc)
+            ]
+            {
+                'hasRecipient': SealedMessage
+            } [
+                'holder': XID(448e2e0b)
+            ]
+            {
+                'hasRecipient': SealedMessage
+            } [
+                'holder': XID(74107ca5)
+            ]
+            'content': ENCRYPTED
+            'provenance': ProvenanceMark(ef7c82c8)
+            'signed': Signature
+        ]
+    "#}).trim();
+    assert_eq!(roundtrip_env.format(), expected_rt);
+
+    // Idempotent: decode the round-tripped envelope and compare Editions.
+    let edition_rt2 = Edition::try_from(roundtrip_env).unwrap();
+    // Entire Edition is idempotent and comparable
+    assert_eq!(edition_rt, edition_rt2);
 }
