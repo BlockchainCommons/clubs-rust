@@ -43,7 +43,10 @@ fn basic_scenario_alice_bob_charlie() {
         permit::for_member(bob.xid(), &bob_k.public_keys()),
         permit::for_member(charlie.xid(), &charlie_k.public_keys()),
     ];
-    let sealed = edition.seal_and_sign(&recipients, &club_k, None).unwrap();
+    let (sealed, shares) = edition
+        .seal_with_permits(&recipients, None, &club_k, None)
+        .unwrap();
+    assert!(shares.is_none());
 
     // Phase One: print and collect expected text, then replace with assert below.
     // println!("{}", sealed.format());

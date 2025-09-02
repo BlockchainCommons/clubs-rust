@@ -13,8 +13,10 @@
 //! - Permit types beyond public-key (password, SSKR, etc.) are not modeled yet.
 //! - Write-group/threshold signing is represented via simple add-signature helpers.
 
-use anyhow::{anyhow, Result};
-use bc_components::{Digest, DigestProvider, PublicKeys, Signature, SymmetricKey};
+use anyhow::{anyhow, bail, Result};
+use bc_components::{
+    Digest, DigestProvider, PublicKeys, SSKRSpec, Signature, SymmetricKey,
+};
 use bc_envelope::prelude::*;
 use bc_components::XID;
 use known_values::{
@@ -50,6 +52,7 @@ impl PublicKeyPermit {
         }
     }
 }
+
 
 /// A single edition (revision) of a Club's content.
 #[derive(Clone, Debug, PartialEq)]
@@ -107,71 +110,69 @@ impl Edition {
         self.to_unsigned_envelope().digest().into_owned()
     }
 
-    /// Seal the content with a fresh per-edition symmetric key `k`, and attach
-    /// public-key permits for each intended reader.
+    /// Seal the content with optional permits (public-key and/or SSKR), and sign.
     ///
-    /// - Binds permits to this edition via Additional Authenticated Data (AAD)
-    ///   when constructing the `SealedMessage`.
-    /// - Each permit can optionally carry `member_xid` annotation.
-    pub fn seal_with_public_key_permits(
+    /// - If no permits are provided, the content remains plaintext but the
+    ///   edition is still signed.
+    /// - If public-key recipients are provided, wraps+encrypts the content and
+    ///   adds `hasRecipient` assertions bound to the edition digest via AAD.
+    /// - If `sskr_spec` is provided, splits the same content key and returns
+    ///   share envelopes.
+    pub fn seal_with_permits(
         &self,
         recipients: &[PublicKeyPermit],
-    ) -> Result<Envelope> {
-        // Fresh content key per edition.
-        let content_key = SymmetricKey::new();
-
-        // Encrypt the entire content envelope (wrap + encrypt).
-        let encrypted_content = self.content.encrypt(&content_key);
-
-        // Prepare the unsigned public metadata (club, provenance, etc.).
-        // Replace plaintext with encrypted content.
-        let mut edition = Envelope::new(self.club)
-            .add_assertion(PROVENANCE, self.provenance.clone())
-            .add_assertion(CONTENT, encrypted_content);
-
-        // Compute an edition-id for AAD binding of permits.
-        let edition_id = edition.digest().into_owned();
-        let edition_id_aad: Vec<u8> = edition_id.data().to_vec();
-
-        // Attach a permit for each recipient.
-        for pkp in recipients {
-            match pkp {
-                PublicKeyPermit::Encode { recipient, member_xid } => {
-                    // Bind AAD to edition id to tie wrap to this edition.
-                    let sealed = bc_components::SealedMessage::new_with_aad(
-                        content_key.to_cbor_data(),
-                        recipient,
-                        Some(edition_id_aad.as_slice()),
-                    );
-                    let mut assertion = Envelope::new_assertion(known_values::HAS_RECIPIENT, sealed);
-                    if let Some(xid) = member_xid {
-                        assertion = assertion.add_assertion(HOLDER, *xid);
-                    }
-                    edition = edition.add_assertion_envelope(assertion)?;
-                }
-                PublicKeyPermit::Decode { sealed, member_xid } => {
-                    // Re-emit existing sealed message to preserve idempotence.
-                    let mut assertion = Envelope::new_assertion(known_values::HAS_RECIPIENT, sealed.clone());
-                    if let Some(xid) = member_xid {
-                        assertion = assertion.add_assertion(HOLDER, *xid);
-                    }
-                    edition = edition.add_assertion_envelope(assertion)?;
-                }
-            }
-        }
-
-        Ok(edition)
-    }
-
-    /// Convenience: seal with permits and then add a signature from the write group key.
-    pub fn seal_and_sign(
-        &self,
-        recipients: &[PublicKeyPermit],
+        sskr_spec: Option<SSKRSpec>,
         signer: &dyn bc_components::Signer,
         signing_options: Option<bc_components::SigningOptions>,
-    ) -> Result<Envelope> {
-        let sealed = self.seal_with_public_key_permits(recipients)?;
-        Ok(sealed.add_signature_opt(signer, signing_options, None))
+    ) -> Result<(Envelope, Option<Vec<Vec<Envelope>>>)> {
+        // Fresh content key per edition.
+        let content_key = SymmetricKey::new();
+        let do_encrypt = !recipients.is_empty() || sskr_spec.is_some();
+
+        // Build base envelope with provenance.
+        let mut edition = Envelope::new(self.club)
+            .add_assertion(PROVENANCE, self.provenance.clone());
+
+        let mut sskr_shares: Option<Vec<Vec<Envelope>>> = None;
+
+        if do_encrypt {
+            let encrypted_content = self.content.encrypt(&content_key);
+            edition = edition.add_assertion(CONTENT, encrypted_content.clone());
+
+            // Compute edition-id for AAD binding of permits.
+            let edition_id_aad: Vec<u8> = edition.digest().data().to_vec();
+
+            for pkp in recipients {
+                match pkp {
+                    PublicKeyPermit::Encode { recipient, member_xid } => {
+                        let sealed = bc_components::SealedMessage::new_with_aad(
+                            content_key.to_cbor_data(),
+                            recipient,
+                            Some(edition_id_aad.as_slice()),
+                        );
+                        let mut assertion =
+                            Envelope::new_assertion(known_values::HAS_RECIPIENT, sealed);
+                        if let Some(xid) = member_xid {
+                            assertion = assertion.add_assertion(HOLDER, *xid);
+                        }
+                        edition = edition.add_assertion_envelope(assertion)?;
+                    }
+                    PublicKeyPermit::Decode { .. } => {
+                        bail!("Cannot use decode permit when sealing a new edition");
+                    }
+                }
+            }
+
+            if let Some(spec) = sskr_spec.as_ref() {
+                sskr_shares = Some(encrypted_content.sskr_split(spec, &content_key)?);
+            }
+        } else {
+            // Leave content plaintext.
+            edition = edition.add_assertion(CONTENT, self.content.clone());
+        }
+
+        let signed = edition.add_signature_opt(signer, signing_options, None);
+        Ok((signed, sskr_shares))
     }
 }
 
