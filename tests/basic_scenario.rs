@@ -1,7 +1,7 @@
 use bc_envelope::prelude::*;
 use bc_components::{PrivateKeyBase, PublicKeysProvider, XIDProvider};
 use bc_xid::XIDDocument;
-use clubs::edition::{Edition, PublicKeyPermitMeta};
+use clubs::edition::{permit, Edition, PublicKeyPermit};
 use indoc::indoc;
 use known_values::NAME;
 use provenance_mark::{ProvenanceMarkGenerator, ProvenanceMarkResolution};
@@ -38,10 +38,10 @@ fn basic_scenario_alice_bob_charlie() {
 
     // Edition 1: sealed to all three, signed by the club.
     let edition = Edition::new(club.xid(), provenance, content);
-    let recipients = vec![
-        (alice_k.public_keys(), PublicKeyPermitMeta::new(Some(alice.xid()))),
-        (bob_k.public_keys(), PublicKeyPermitMeta::new(Some(bob.xid()))),
-        (charlie_k.public_keys(), PublicKeyPermitMeta::new(Some(charlie.xid()))),
+    let recipients: Vec<PublicKeyPermit> = vec![
+        permit::for_member(alice.xid(), &alice_k.public_keys()),
+        permit::for_member(bob.xid(), &bob_k.public_keys()),
+        permit::for_member(charlie.xid(), &charlie_k.public_keys()),
     ];
     let sealed = edition.seal_and_sign(&recipients, &club_k, None).unwrap();
 
