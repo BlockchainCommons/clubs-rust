@@ -1,9 +1,13 @@
 use std::collections::BTreeMap;
 
-use bc_components::{DigestProvider, XIDProvider};
+use bc_components::XIDProvider;
 use bc_envelope::prelude::*;
 use clubs::frost::{
-    aggregate_and_attach_signature as agg_attach, FrostDealer, FrostSigner,
+    aggregate_and_attach_signature as agg_attach,
+    build_signing_package,
+    FrostDealer,
+    FrostSigner,
+    FrostSignatureSharesG,
 };
 use bc_xid::XIDDocument;
 
@@ -24,12 +28,25 @@ fn frost_two_of_three_signs_envelope_and_verify() {
         FrostSigner { xid: bob_doc.xid(), identifier: 2 },
         FrostSigner { xid: charlie_doc.xid(), identifier: 3 },
     ];
-    let mut dealer = FrostDealer::new_trusted_dealer(2, signers).unwrap();
+    let (dealer, mut participants) = FrostDealer::new_trusted_dealer(2, signers).unwrap();
     let group = dealer.group().clone();
 
-    // Use Gordian API for Round-1 and Round-2:
-    let signing_package_g = dealer.round1_prepare(&wrapped, &[1, 2]).unwrap();
-    let shares_g = dealer.round2_sign(&signing_package_g, &[1, 2]).unwrap();
+    // Round-1: each selected participant generates commitments locally
+    let mut commitments = BTreeMap::new();
+    for sid in [1u16, 2u16] {
+        let c = participants.get_mut(&sid).unwrap().round1_commit().unwrap();
+        commitments.insert(sid, c);
+    }
+    // Build signing package from envelope digest and commitments
+    let signing_package_g = build_signing_package(&wrapped, commitments);
+
+    // Round-2: each selected participant produces their signature share locally
+    let mut shares_map = BTreeMap::new();
+    for sid in [1u16, 2u16] {
+        let s = participants.get(&sid).unwrap().round2_sign(&signing_package_g).unwrap();
+        shares_map.insert(sid, s);
+    }
+    let shares_g = FrostSignatureSharesG { shares: shares_map };
     let (signed_wrapped, signing_key) = agg_attach(&wrapped, &group, &signing_package_g, &shares_g).unwrap();
     assert!(signed_wrapped.has_signature_from(&signing_key).unwrap());
     signed_wrapped.verify_signature_from(&signing_key).unwrap();
