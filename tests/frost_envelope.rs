@@ -94,22 +94,24 @@ fn frost_two_of_three_signs_envelope_and_verify() {
         &signing_package,
         &shares,
         &public_key_package,
-        message,
     );
     assert!(signed_wrapped.has_signature_from(&signing_key).unwrap());
     signed_wrapped.verify_signature_from(&signing_key).unwrap();
 }
 
 fn aggregate_and_attach_signature(
-    wrapped: &Envelope,
+    envelope: &Envelope,
     signing_package: &frost::SigningPackage,
     shares: &BTreeMap<Identifier, SignatureShare>,
     public_key_package: &PublicKeyPackage,
-    message: &[u8],
 ) -> (Envelope, SigningPublicKey) {
     // Aggregate and check with FROST verifying key
     let group_sig = frost::aggregate(signing_package, shares, public_key_package)
         .expect("aggregate");
+    // Derive message to verify from the envelope's subject digest
+    let subject = envelope.subject();
+    let subject_digest = subject.digest();
+    let message: &[u8] = subject_digest.as_ref().as_ref();
     public_key_package
         .verifying_key()
         .verify(message, &group_sig)
@@ -133,7 +135,7 @@ fn aggregate_and_attach_signature(
     let schnorr_pk = SchnorrPublicKey::from_data(xonly);
     let signing_key = SigningPublicKey::from_schnorr(schnorr_pk);
 
-    // Attach signature to wrapped envelope
-    let signed_wrapped = wrapped.add_assertion(known_values::SIGNED, signature);
-    (signed_wrapped, signing_key)
+    // Attach signature assertion to the envelope (signatures are assertions on the subject)
+    let signed = envelope.add_assertion(known_values::SIGNED, signature);
+    (signed, signing_key)
 }
