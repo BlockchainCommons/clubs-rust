@@ -2,10 +2,10 @@ We are working in this Rust workspace, but specifically on the crate called `clu
 
 For minimal context, read these files:
 
+- clubs/docs/XanaduToReality.md
 - clubs/docs/PublicKeyPermits.md
 - clubs/docs/dcbor-draft.md
 - clubs/docs/envelope-links.md
-- clubs/docs/XanaduToReality.md
 
 Also you will want to explore the APIs in these local crates:
 

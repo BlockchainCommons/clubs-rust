@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::{Result, anyhow, bail};
+use bc_components::DigestProvider;
 use bc_components::Signature;
 use bc_envelope::prelude::*;
 use frost_secp256k1_tr::round1::{NonceCommitment, SigningCommitments};
@@ -57,9 +58,13 @@ pub fn aggregate_and_attach_signature(
         let comm = SigningCommitments::new(hiding, binding);
         frost_commitments.insert(id, comm);
     }
+    // Derive message digest from the package's message Envelope subject
+    let subj_env = signing_package_g.message.subject();
+    let msg_digest = subj_env.digest();
+    let msg_bytes: &[u8] = msg_digest.as_ref().as_ref();
     let signing_package = frost_secp256k1_tr::SigningPackage::new(
         frost_commitments,
-        &signing_package_g.message,
+        msg_bytes,
     );
     // Convert shares
     let mut frost_shares: BTreeMap<

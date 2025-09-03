@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::{Result, anyhow};
+use bc_components::DigestProvider;
 use bc_components::XID;
 use frost_secp256k1_tr::{
     self as frost, Identifier,
@@ -77,8 +78,11 @@ impl FrostParticipant {
             frost_commitments
                 .insert(id, SigningCommitments::new(hiding, binding));
         }
-        let frost_sp =
-            frost::SigningPackage::new(frost_commitments, &signing_pkg.message);
+        // Derive message digest from the package's message Envelope subject
+        let subj_env = signing_pkg.message.subject();
+        let msg_digest = subj_env.digest();
+        let msg_bytes: &[u8] = msg_digest.as_ref().as_ref();
+        let frost_sp = frost::SigningPackage::new(frost_commitments, msg_bytes);
 
         let share = frost::round2::sign(&frost_sp, nonces, &self.key_package)
             .map_err(|e| {

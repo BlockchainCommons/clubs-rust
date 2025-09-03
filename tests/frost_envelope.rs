@@ -2,8 +2,7 @@ use bc_components::XIDProvider;
 use bc_envelope::prelude::*;
 use bc_xid::XIDDocument;
 use clubs::frost::{
-    FrostGroup, FrostSignatureShares,
-    aggregate_and_attach_signature, build_signing_package,
+    FrostCoordinator, FrostGroup,
 };
 
 #[test]
@@ -33,20 +32,29 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     let mut bob_participant = participants.remove(&bob_doc.xid()).unwrap();
     let mut _charlie_participant = participants.remove(&charlie_doc.xid()).unwrap();
 
-    // Round-1: each participant in the roster generates a commitment
+    // Coordinator orchestrates the ceremony as a neutral message hub
+    let mut coordinator = FrostCoordinator::new(group.clone());
+    coordinator.set_message(message);
+
+    // Round-1: each participant in the roster generates a commitment and sends it to coordinator
     let alice_commitment = alice_participant.round1_commit().unwrap();
     let bob_commitment = bob_participant.round1_commit().unwrap();
+    let charlie_commitment = _charlie_participant.round1_commit().unwrap();
+    coordinator.add_commitment(alice_commitment).unwrap();
+    coordinator.add_commitment(bob_commitment).unwrap();
+    // coordinator.add_commitment(charlie_commitment).unwrap();
 
-    // Build signing package from the selected commitments (2-of-3)
-    let signing_package = build_signing_package(&message, vec![alice_commitment, bob_commitment]);
+    // Coordinator compiles a signing package and distributes it to selected participants
+    let signing_package = coordinator.signing_package().unwrap();
 
-    // Round-2: each selected participant produces their signature share locally
+    // Round-2: each selected participant produces their signature share locally and sends it back
     let alice_share = alice_participant.round2_sign(&group, &signing_package).unwrap();
     let bob_share = bob_participant.round2_sign(&group, &signing_package).unwrap();
-    let signature_shares = FrostSignatureShares::new(vec![alice_share, bob_share]);
-    let signed_wrapped =
-        aggregate_and_attach_signature(&message, &group, &signing_package, &signature_shares).unwrap();
+    coordinator.add_share(alice_share).unwrap();
+    coordinator.add_share(bob_share).unwrap();
+
+    // Coordinator aggregates shares and attaches the final signature to the message
+    let signed_envelope = coordinator.finalize().unwrap();
     let signing_key = group.verifying_signing_key();
-    assert!(signed_wrapped.has_signature_from(&signing_key).unwrap());
-    signed_wrapped.verify_signature_from(&signing_key).unwrap();
+    signed_envelope.verify_signature_from(&signing_key).unwrap();
 }

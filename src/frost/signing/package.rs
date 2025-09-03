@@ -2,26 +2,21 @@ use bc_envelope::prelude::*;
 
 use super::commitment::FrostSigningCommitment;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct FrostSigningPackage {
-    pub(crate) message: Vec<u8>,
+    pub(crate) message: Envelope,
     pub(crate) commitments: Vec<FrostSigningCommitment>,
 }
 
 pub fn build_signing_package(
     envelope: &Envelope,
     commitments: Vec<FrostSigningCommitment>,
-) -> FrostSigningPackage {
-    let subj = envelope.subject();
-    let d = subj.digest();
-    let message = d.as_ref().data().to_vec();
-    FrostSigningPackage { message, commitments }
-}
+) -> FrostSigningPackage { FrostSigningPackage { message: envelope.clone(), commitments } }
 
 impl From<FrostSigningPackage> for Envelope {
     fn from(value: FrostSigningPackage) -> Self {
         let mut e = Envelope::new(known_values::UNIT);
-        e = e.add_assertion("message", CBOR::to_byte_string(value.message.clone()));
+        e = e.add_assertion("message", value.message.clone());
         for c in value.commitments {
             let ce: Envelope = c.into();
             let assertion = Envelope::new_assertion("commitment", ce);
@@ -40,7 +35,7 @@ impl TryFrom<Envelope> for FrostSigningPackage {
             anyhow::bail!("unexpected subject for FrostSigningPackage");
         }
         let msg_env = envelope.object_for_predicate("message")?;
-        let message = msg_env.try_leaf()?.try_byte_string()?.to_vec();
+        let message = msg_env;
         let mut commitments: Vec<FrostSigningCommitment> = Vec::new();
         for assertion in envelope.assertions() {
             let pred_env = assertion.try_predicate()?;
@@ -73,7 +68,8 @@ mod tests {
         );
         let c1 = FrostSigningCommitment { xid: xid1, hiding: [1; 33], binding: [2; 33] };
         let c2 = FrostSigningCommitment { xid: xid2, hiding: [3; 33], binding: [4; 33] };
-        let pkg = FrostSigningPackage { message: vec![0xDE, 0xAD, 0xBE, 0xEF], commitments: vec![c1.clone(), c2.clone()] };
+        let msg = Envelope::new("MSG");
+        let pkg = FrostSigningPackage { message: msg.clone(), commitments: vec![c1.clone(), c2.clone()] };
         let env: Envelope = pkg.clone().into();
         #[rustfmt::skip]
         let expected = (indoc! {r#"
@@ -88,12 +84,13 @@ mod tests {
                     "hiding": Bytes(33)
                     'holder': XID(22222222)
                 ]
-                "message": Bytes(4)
+                "message": "MSG"
             ]
         "#}).trim();
         assert_eq!(env.format(), expected);
         let rt = FrostSigningPackage::try_from(env).unwrap();
-        assert_eq!(pkg.message, rt.message);
+        use bc_components::DigestProvider;
+        assert_eq!(pkg.message.subject().digest(), rt.message.subject().digest());
         let mut a = pkg.commitments.clone();
         let mut b = rt.commitments.clone();
         a.sort_by_key(|c| c.xid);
@@ -101,4 +98,3 @@ mod tests {
         assert_eq!(a, b);
     }
 }
-
