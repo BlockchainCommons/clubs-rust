@@ -27,12 +27,10 @@ impl TryFrom<Envelope> for FrostSignatureShare {
         if kv.value() != known_values::UNIT.value() {
             anyhow::bail!("unexpected subject for FrostSignatureShare");
         }
-        let xid_env = envelope.object_for_predicate(HOLDER)?;
-        let xid: XID = xid_env.try_leaf()?.try_into()?;
-        let session_env = envelope.object_for_predicate("session")?;
-        let session: ARID = session_env.try_leaf()?.try_into()?;
-        let share_env = envelope.object_for_predicate("share")?;
-        let share = share_env.try_leaf()?.try_byte_string()?.to_vec();
+        let xid: XID = envelope.try_object_for_predicate(HOLDER)?;
+        let session: ARID = envelope.try_object_for_predicate("session")?;
+        let share_bs: ByteString = envelope.try_object_for_predicate("share")?;
+        let share: Vec<u8> = share_bs.into();
         Ok(FrostSignatureShare { xid, session, share })
     }
 }

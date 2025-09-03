@@ -34,8 +34,7 @@ impl TryFrom<Envelope> for FrostSignatureShares {
         if kv.value() != known_values::UNIT.value() {
             anyhow::bail!("unexpected subject for FrostSignatureShares");
         }
-        let session_env = envelope.object_for_predicate("session")?;
-        let session: ARID = session_env.try_leaf()?.try_into()?;
+        let session: ARID = envelope.try_object_for_predicate("session")?;
         let mut shares: Vec<FrostSignatureShare> = Vec::new();
         for assertion in envelope.assertions() {
             let pred_env = assertion.try_predicate()?;

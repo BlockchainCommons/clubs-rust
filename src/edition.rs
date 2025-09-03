@@ -234,7 +234,7 @@ impl TryFrom<Envelope> for Edition {
 
     fn try_from(envelope: Envelope) -> Result<Self> {
         // Subject must be the club XID
-        let club: XID = envelope.subject().try_leaf()?.try_into()?;
+        let club: XID = envelope.extract_subject()?;
 
         let mut provenance: Option<ProvenanceMark> = None;
         let mut content: Option<Envelope> = None;
@@ -276,13 +276,8 @@ impl TryFrom<Envelope> for Edition {
                         let holder_xid: Option<XID> = match assertion
                             .optional_assertion_with_predicate(HOLDER)?
                         {
-                            Some(holder_assertion) => {
-                                let holder_obj =
-                                    holder_assertion.try_object()?;
-                                let xid: XID =
-                                    holder_obj.try_leaf()?.try_into()?;
-                                Some(xid)
-                            }
+                            Some(holder_assertion) =>
+                                Some(holder_assertion.extract_object::<XID>()?),
                             None => None,
                         };
                         // Push permit with optional holder

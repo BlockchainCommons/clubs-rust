@@ -38,10 +38,8 @@ impl TryFrom<Envelope> for FrostSigningPackage {
         if kv.value() != known_values::UNIT.value() {
             anyhow::bail!("unexpected subject for FrostSigningPackage");
         }
-        let session_env = envelope.object_for_predicate("session")?;
-        let session: ARID = session_env.try_leaf()?.try_into()?;
-        let msg_env = envelope.object_for_predicate("message")?;
-        let message = msg_env;
+        let session: ARID = envelope.try_object_for_predicate("session")?;
+        let message = envelope.object_for_predicate("message")?;
         let mut commitments: Vec<FrostSigningCommitment> = Vec::new();
         for assertion in envelope.assertions() {
             let pred_env = assertion.try_predicate()?;

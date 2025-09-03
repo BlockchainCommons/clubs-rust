@@ -29,20 +29,18 @@ impl TryFrom<Envelope> for FrostSigningCommitment {
         if kv.value() != known_values::UNIT.value() {
             anyhow::bail!("unexpected subject for FrostSigningCommitment");
         }
-        let xid_env = envelope.object_for_predicate(HOLDER)?;
-        let xid: XID = xid_env.try_leaf()?.try_into()?;
-        let session_env = envelope.object_for_predicate("session")?;
-        let session: ARID = session_env.try_leaf()?.try_into()?;
-        let hiding_env = envelope.object_for_predicate("hiding")?;
-        let hiding_bytes = hiding_env.try_leaf()?.try_byte_string()?;
+        let xid: XID = envelope.try_object_for_predicate(HOLDER)?;
+        let session: ARID = envelope.try_object_for_predicate("session")?;
+        let hiding_bs: ByteString = envelope.try_object_for_predicate("hiding")?;
+        let hiding_bytes = hiding_bs.as_ref();
         if hiding_bytes.len() != 33 { anyhow::bail!("invalid hiding length"); }
         let mut hiding = [0u8; 33];
-        hiding.copy_from_slice(&hiding_bytes);
-        let binding_env = envelope.object_for_predicate("binding")?;
-        let binding_bytes = binding_env.try_leaf()?.try_byte_string()?;
+        hiding.copy_from_slice(hiding_bytes);
+        let binding_bs: ByteString = envelope.try_object_for_predicate("binding")?;
+        let binding_bytes = binding_bs.as_ref();
         if binding_bytes.len() != 33 { anyhow::bail!("invalid binding length"); }
         let mut binding = [0u8; 33];
-        binding.copy_from_slice(&binding_bytes);
+        binding.copy_from_slice(binding_bytes);
         Ok(FrostSigningCommitment { xid, session, hiding, binding })
     }
 }
