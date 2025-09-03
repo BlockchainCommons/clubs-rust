@@ -42,6 +42,10 @@ pub fn aggregate_and_attach_signature(
     signing_package_g: &FrostSigningPackage,
     shares_g: &FrostSignatureShares,
 ) -> Result<Envelope> {
+    // Validate session consistency
+    if signing_package_g.session != shares_g.session {
+        bail!("signing package and shares belong to different sessions");
+    }
     // Convert group public key package
     let frost_pkg = group.to_frost_public_key_package()?;
     // Convert signing package
@@ -72,6 +76,9 @@ pub fn aggregate_and_attach_signature(
         frost_secp256k1_tr::round2::SignatureShare,
     > = BTreeMap::new();
     for share in &shares_g.shares {
+        if share.session != signing_package_g.session {
+            bail!("signature share session mismatch");
+        }
         let id = group.id_for_xid(&share.xid)?;
         let share = frost_secp256k1_tr::round2::SignatureShare::deserialize(
             &share.share,

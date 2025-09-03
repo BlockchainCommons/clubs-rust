@@ -90,6 +90,7 @@ pub struct FrostGroup {
     verifying_key: SigningPublicKey,
     pub(super) pubkey_package: FrostPublicKeyPackage,
     id_map: BTreeMap<XID, Identifier>,
+    participant_keys: BTreeMap<XID, SigningPublicKey>,
 }
 
 impl FrostGroup {
@@ -100,10 +101,28 @@ impl FrostGroup {
         id_map: BTreeMap<XID, Identifier>,
     ) -> Self {
         let verifying_key = pubkey_package.verifying_signing_key();
-        Self { threshold, members, verifying_key, pubkey_package, id_map }
+        // Precompute per-member signing public keys from verifying shares
+        let mut participant_keys: BTreeMap<XID, SigningPublicKey> = BTreeMap::new();
+        for (xid, ident) in &id_map {
+            let id_bytes = ident.serialize();
+            if let Some(sec1) = pubkey_package.verifying_shares_sec1.get(&id_bytes) {
+                let mut xonly = [0u8; 32];
+                xonly.copy_from_slice(&sec1[1..]);
+                let schnorr_pk = bc_components::SchnorrPublicKey::from_data(xonly);
+                participant_keys.insert(*xid, SigningPublicKey::from_schnorr(schnorr_pk));
+            }
+        }
+        Self { threshold, members, verifying_key, pubkey_package, id_map, participant_keys }
     }
 
     pub fn verifying_signing_key(&self) -> SigningPublicKey { self.verifying_key.clone() }
+
+    pub fn member_verifying_signing_key(&self, xid: &XID) -> Result<SigningPublicKey> {
+        self.participant_keys
+            .get(xid)
+            .cloned()
+            .ok_or_else(|| anyhow!("unknown member XID in group: {}", xid))
+    }
 
     pub(super) fn id_for_xid(&self, xid: &XID) -> Result<Identifier> {
         self.id_map

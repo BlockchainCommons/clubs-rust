@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::{Result, anyhow};
-use bc_components::DigestProvider;
-use bc_components::XID;
+use bc_components::{DigestProvider, XID, ARID};
 use frost_secp256k1_tr::{
     self as frost, Identifier,
     round1::{NonceCommitment, SigningCommitments},
@@ -33,8 +32,8 @@ impl FrostParticipant {
     pub fn xid(&self) -> XID { self.xid }
 
     /// Perform Round-1 locally: generate nonces and commitments. Stores nonces
-    /// for Round-2.
-    pub fn round1_commit(&mut self) -> Result<FrostSigningCommitment> {
+    /// for Round-2. Binds to a specific session.
+    pub fn round1_commit(&mut self, session: ARID) -> Result<FrostSigningCommitment> {
         let (nonces, comms) =
             frost::round1::commit(self.key_package.signing_share(), &mut OsRng);
         self.nonces = Some(nonces);
@@ -50,7 +49,7 @@ impl FrostParticipant {
         h.copy_from_slice(&hid);
         let mut b = [0u8; 33];
         b.copy_from_slice(&bind);
-        Ok(FrostSigningCommitment { xid: self.xid, hiding: h, binding: b })
+        Ok(FrostSigningCommitment { xid: self.xid, session, hiding: h, binding: b })
     }
 
     /// Perform Round-2 locally: produce a signature share using stored nonces.
@@ -88,6 +87,6 @@ impl FrostParticipant {
             .map_err(|e| {
             anyhow!("round2 sign failed for {}: {e}", self.xid)
         })?;
-        Ok(FrostSignatureShare { xid: self.xid, share: share.serialize() })
+        Ok(FrostSignatureShare { xid: self.xid, session: signing_pkg.session, share: share.serialize() })
     }
 }
