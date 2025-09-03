@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use bc_components::{SigningPublicKey, XID};
 use frost_secp256k1_tr::{self as frost, Identifier};
 use rand::rngs::OsRng;
+use dcbor::prelude::*; // ByteString
 
 use crate::frost::participant::FrostParticipant;
 
@@ -11,14 +12,16 @@ use crate::frost::participant::FrostParticipant;
 // module tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct FrostPublicKeyPackage {
-    pub(super) verifying_key_sec1: [u8; 33],
-    pub(super) verifying_shares_sec1: BTreeMap<Vec<u8>, [u8; 33]>,
+    pub(super) verifying_key_sec1: ByteString,
+    pub(super) verifying_shares_sec1: BTreeMap<ByteString, ByteString>,
 }
 
 impl FrostPublicKeyPackage {
     pub(super) fn verifying_signing_key(&self) -> SigningPublicKey {
+        let sec1 = self.verifying_key_sec1.as_ref();
+        debug_assert_eq!(sec1.len(), 33);
         let mut xonly = [0u8; 32];
-        xonly.copy_from_slice(&self.verifying_key_sec1[1..]);
+        xonly.copy_from_slice(&sec1[1..]);
         let schnorr_pk = bc_components::SchnorrPublicKey::from_data(xonly);
         SigningPublicKey::from_schnorr(schnorr_pk)
     }
@@ -26,31 +29,22 @@ impl FrostPublicKeyPackage {
     pub(super) fn from_frost(
         pkg: &frost_secp256k1_tr::keys::PublicKeyPackage,
     ) -> Result<Self> {
-        use anyhow::{anyhow, bail};
-
         let vkey = pkg
             .verifying_key()
             .serialize()
             .map_err(|e| anyhow!("serialize verifying key: {e}"))?;
-        if vkey.len() != 33 {
-            bail!("invalid verifying key length");
-        }
-        let mut verifying_key_sec1 = [0u8; 33];
-        verifying_key_sec1.copy_from_slice(&vkey);
+        if vkey.len() != 33 { bail!("invalid verifying key length"); }
+        let verifying_key_sec1: ByteString = vkey.into();
 
-        let mut verifying_shares_sec1: BTreeMap<Vec<u8>, [u8; 33]> =
+        let mut verifying_shares_sec1: BTreeMap<ByteString, ByteString> =
             BTreeMap::new();
         for (id, vs) in pkg.verifying_shares().iter() {
-            let id_bytes = id.serialize();
+            let id_bytes = ByteString::from(id.serialize());
             let vs_bytes = vs
                 .serialize()
                 .map_err(|e| anyhow!("serialize verifying share: {e}"))?;
-            if vs_bytes.len() != 33 {
-                bail!("invalid verifying share size");
-            }
-            let mut arr = [0u8; 33];
-            arr.copy_from_slice(&vs_bytes);
-            verifying_shares_sec1.insert(id_bytes, arr);
+            if vs_bytes.len() != 33 { bail!("invalid verifying share size"); }
+            verifying_shares_sec1.insert(id_bytes, vs_bytes.into());
         }
         Ok(Self { verifying_key_sec1, verifying_shares_sec1 })
     }
@@ -61,7 +55,7 @@ impl FrostPublicKeyPackage {
         use anyhow::anyhow;
         use frost_secp256k1_tr::{VerifyingKey, keys::VerifyingShare};
 
-        let verifying_key = VerifyingKey::deserialize(&self.verifying_key_sec1)
+        let verifying_key = VerifyingKey::deserialize(self.verifying_key_sec1.as_ref())
             .map_err(|e| anyhow!("deserialize verifying key: {e}"))?;
 
         let mut vshares: BTreeMap<
@@ -69,9 +63,9 @@ impl FrostPublicKeyPackage {
             VerifyingShare,
         > = BTreeMap::new();
         for (id_bytes, sec1) in &self.verifying_shares_sec1 {
-            let id = frost_secp256k1_tr::Identifier::deserialize(id_bytes)
+            let id = frost_secp256k1_tr::Identifier::deserialize(id_bytes.as_ref())
                 .map_err(|e| anyhow!("deserialize identifier: {e}"))?;
-            let vs = VerifyingShare::deserialize(sec1)
+            let vs = VerifyingShare::deserialize(sec1.as_ref())
                 .map_err(|e| anyhow!("deserialize verifying share: {e}"))?;
             vshares.insert(id, vs);
         }
@@ -104,8 +98,10 @@ impl FrostGroup {
         // Precompute per-member signing public keys from verifying shares
         let mut participant_keys: BTreeMap<XID, SigningPublicKey> = BTreeMap::new();
         for (xid, ident) in &id_map {
-            let id_bytes = ident.serialize();
+            let id_bytes = ByteString::from(ident.serialize());
             if let Some(sec1) = pubkey_package.verifying_shares_sec1.get(&id_bytes) {
+                let sec1 = sec1.as_ref();
+                debug_assert_eq!(sec1.len(), 33);
                 let mut xonly = [0u8; 32];
                 xonly.copy_from_slice(&sec1[1..]);
                 let schnorr_pk = bc_components::SchnorrPublicKey::from_data(xonly);

@@ -6,8 +6,18 @@ use known_values::HOLDER;
 pub struct FrostSigningCommitment {
     pub xid: XID,
     pub session: ARID,
-    pub(crate) hiding: [u8; 33],
-    pub(crate) binding: [u8; 33],
+    pub(crate) hiding: ByteString,
+    pub(crate) binding: ByteString,
+}
+
+impl FrostSigningCommitment {
+    pub fn new(xid: XID, session: ARID, hiding: impl AsRef<[u8]>, binding: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+        let h = hiding.as_ref();
+        let b = binding.as_ref();
+        if h.len() != 33 { anyhow::bail!("invalid hiding length: {}", h.len()); }
+        if b.len() != 33 { anyhow::bail!("invalid binding length: {}", b.len()); }
+        Ok(Self { xid, session, hiding: ByteString::from(h), binding: ByteString::from(b) })
+    }
 }
 
 impl From<FrostSigningCommitment> for Envelope {
@@ -15,8 +25,8 @@ impl From<FrostSigningCommitment> for Envelope {
         let mut e = Envelope::new(known_values::UNIT);
         e = e.add_assertion(HOLDER, value.xid);
         e = e.add_assertion("session", value.session);
-        e = e.add_assertion("hiding", CBOR::to_byte_string(value.hiding));
-        e = e.add_assertion("binding", CBOR::to_byte_string(value.binding));
+        e = e.add_assertion("hiding", CBOR::from(value.hiding));
+        e = e.add_assertion("binding", CBOR::from(value.binding));
         e
     }
 }
@@ -31,16 +41,10 @@ impl TryFrom<Envelope> for FrostSigningCommitment {
         }
         let xid: XID = envelope.try_object_for_predicate(HOLDER)?;
         let session: ARID = envelope.try_object_for_predicate("session")?;
-        let hiding_bs: ByteString = envelope.try_object_for_predicate("hiding")?;
-        let hiding_bytes = hiding_bs.as_ref();
-        if hiding_bytes.len() != 33 { anyhow::bail!("invalid hiding length"); }
-        let mut hiding = [0u8; 33];
-        hiding.copy_from_slice(hiding_bytes);
-        let binding_bs: ByteString = envelope.try_object_for_predicate("binding")?;
-        let binding_bytes = binding_bs.as_ref();
-        if binding_bytes.len() != 33 { anyhow::bail!("invalid binding length"); }
-        let mut binding = [0u8; 33];
-        binding.copy_from_slice(binding_bytes);
+        let hiding: ByteString = envelope.try_object_for_predicate("hiding")?;
+        let binding: ByteString = envelope.try_object_for_predicate("binding")?;
+        if hiding.len() != 33 { anyhow::bail!("invalid hiding length"); }
+        if binding.len() != 33 { anyhow::bail!("invalid binding length"); }
         Ok(FrostSigningCommitment { xid, session, hiding, binding })
     }
 }
@@ -58,7 +62,7 @@ mod tests {
         let session = bc_components::ARID::from_hex(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         );
-        let commit = FrostSigningCommitment { xid, session, hiding: [0xA1; 33], binding: [0xB2; 33] };
+        let commit = FrostSigningCommitment::new(xid, session, [0xA1; 33], [0xB2; 33]).unwrap();
         let env: Envelope = commit.clone().into();
         #[rustfmt::skip]
         let expected = (indoc! {r#"

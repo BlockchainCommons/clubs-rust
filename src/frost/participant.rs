@@ -45,11 +45,7 @@ impl FrostParticipant {
             .binding()
             .serialize()
             .map_err(|e| anyhow!("serialize binding commitment: {e}"))?;
-        let mut h = [0u8; 33];
-        h.copy_from_slice(&hid);
-        let mut b = [0u8; 33];
-        b.copy_from_slice(&bind);
-        Ok(FrostSigningCommitment { xid: self.xid, session, hiding: h, binding: b })
+        FrostSigningCommitment::new(self.xid, session, &hid, &bind)
     }
 
     /// Perform Round-2 locally: produce a signature share using stored nonces.
@@ -70,9 +66,9 @@ impl FrostParticipant {
             BTreeMap::new();
         for comm in &signing_pkg.commitments {
             let id = group.id_for_xid(&comm.xid)?;
-            let hiding = NonceCommitment::deserialize(&comm.hiding)
+            let hiding = NonceCommitment::deserialize(comm.hiding.as_ref())
                 .map_err(|e| anyhow!("deserialize hiding: {e}"))?;
-            let binding = NonceCommitment::deserialize(&comm.binding)
+            let binding = NonceCommitment::deserialize(comm.binding.as_ref())
                 .map_err(|e| anyhow!("deserialize binding: {e}"))?;
             frost_commitments
                 .insert(id, SigningCommitments::new(hiding, binding));

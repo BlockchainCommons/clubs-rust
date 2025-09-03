@@ -73,8 +73,8 @@ mod tests {
         let session = bc_components::ARID::from_hex(
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         );
-        let c1 = FrostSigningCommitment { xid: xid1, session, hiding: [1; 33], binding: [2; 33] };
-        let c2 = FrostSigningCommitment { xid: xid2, session, hiding: [3; 33], binding: [4; 33] };
+        let c1 = FrostSigningCommitment::new(xid1, session, [1; 33], [2; 33]).unwrap();
+        let c2 = FrostSigningCommitment::new(xid2, session, [3; 33], [4; 33]).unwrap();
         let msg = Envelope::new("MSG");
         let pkg = FrostSigningPackage { session, message: msg.clone(), commitments: vec![c1.clone(), c2.clone()] };
         let env: Envelope = pkg.clone().into();

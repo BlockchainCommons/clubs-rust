@@ -55,9 +55,9 @@ pub fn aggregate_and_attach_signature(
     > = BTreeMap::new();
     for c in &signing_package_g.commitments {
         let id = group.id_for_xid(&c.xid)?;
-        let hiding = NonceCommitment::deserialize(&c.hiding)
+        let hiding = NonceCommitment::deserialize(c.hiding.as_ref())
             .map_err(|e| anyhow!("deserialize hiding commitment: {e}"))?;
-        let binding = NonceCommitment::deserialize(&c.binding)
+        let binding = NonceCommitment::deserialize(c.binding.as_ref())
             .map_err(|e| anyhow!("deserialize binding commitment: {e}"))?;
         let comm = SigningCommitments::new(hiding, binding);
         frost_commitments.insert(id, comm);
