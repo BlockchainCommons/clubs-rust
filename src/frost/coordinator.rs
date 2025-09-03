@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use anyhow::{anyhow, Result};
 use bc_envelope::prelude::*;
+use bc_components::XID;
 
 use super::aggregate::aggregate_and_attach_signature;
 use super::group::FrostGroup;
@@ -22,11 +23,19 @@ pub struct FrostCoordinator {
     // Track per-member commitments and shares for idempotency and conflict detection
     commitments: BTreeMap<bc_components::XID, FrostSigningCommitment>,
     shares: BTreeMap<bc_components::XID, FrostSignatureShare>,
+    // The signing package prepared for this ceremony (selected roster)
+    package: Option<FrostSigningPackage>,
 }
 
 impl FrostCoordinator {
     pub fn new(group: FrostGroup) -> Self {
-        Self { group, message: None, commitments: BTreeMap::new(), shares: BTreeMap::new() }
+        Self {
+            group,
+            message: None,
+            commitments: BTreeMap::new(),
+            shares: BTreeMap::new(),
+            package: None,
+        }
     }
 
     pub fn group(&self) -> &FrostGroup { &self.group }
@@ -57,16 +66,47 @@ impl FrostCoordinator {
         Ok(())
     }
 
-    /// Build the signing package for distribution to the selected roster.
-    pub fn signing_package(&self) -> Result<FrostSigningPackage> {
+    /// Build the signing package for distribution to participants.
+    /// Uses ALL collected commitments. Stores the package for finalize().
+    pub fn signing_package(&mut self) -> Result<FrostSigningPackage> {
         let msg = self
             .message
             .as_ref()
             .ok_or_else(|| anyhow!("message not set in coordinator"))?;
-        Ok(build_signing_package(
+        let pkg = build_signing_package(
             msg,
             self.commitments.values().cloned().collect(),
-        ))
+        );
+        self.package = Some(pkg.clone());
+        Ok(pkg)
+    }
+
+    /// Build the signing package using only the specified roster of members.
+    /// This allows collecting commitments from all members, while selecting a
+    /// subset (>= threshold) for this ceremony. Stores the package for finalize().
+    pub fn signing_package_for(&mut self, roster: &[XID]) -> Result<FrostSigningPackage> {
+        if roster.len() < self.group.threshold {
+            return Err(anyhow!(
+                "roster smaller than threshold: {}/{}",
+                roster.len(),
+                self.group.threshold
+            ));
+        }
+        let msg = self
+            .message
+            .as_ref()
+            .ok_or_else(|| anyhow!("message not set in coordinator"))?;
+        let mut selected: Vec<FrostSigningCommitment> = Vec::with_capacity(roster.len());
+        for xid in roster {
+            let c = self
+                .commitments
+                .get(xid)
+                .ok_or_else(|| anyhow!("missing commitment for member {}", xid))?;
+            selected.push(c.clone());
+        }
+        let pkg = build_signing_package(msg, selected);
+        self.package = Some(pkg.clone());
+        Ok(pkg)
     }
 
     /// Add a Round-2 signature share from a participant that consents to sign.
@@ -97,9 +137,12 @@ impl FrostCoordinator {
         let msg = self
             .message
             .ok_or_else(|| anyhow!("message not set in coordinator"))?;
-        let pkg = FrostSigningPackage {
-            message: msg.clone(),
-            commitments: self.commitments.into_values().collect(),
+        let pkg = match self.package.clone() {
+            Some(p) => p,
+            None => FrostSigningPackage {
+                message: msg.clone(),
+                commitments: self.commitments.clone().into_values().collect(),
+            },
         };
         let shares = FrostSignatureShares::new(self.shares.into_values().collect());
         aggregate_and_attach_signature(&msg, &self.group, &pkg, &shares)

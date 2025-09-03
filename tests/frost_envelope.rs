@@ -30,7 +30,7 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     // Materialize participant contexts from the map
     let mut alice_participant = participants.remove(&alice_doc.xid()).unwrap();
     let mut bob_participant = participants.remove(&bob_doc.xid()).unwrap();
-    let mut _charlie_participant = participants.remove(&charlie_doc.xid()).unwrap();
+    let mut charlie_participant = participants.remove(&charlie_doc.xid()).unwrap();
 
     // Coordinator orchestrates the ceremony as a neutral message hub
     let mut coordinator = FrostCoordinator::new(group.clone());
@@ -39,19 +39,27 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     // Round-1: each participant in the roster generates a commitment and sends it to coordinator
     let alice_commitment = alice_participant.round1_commit().unwrap();
     let bob_commitment = bob_participant.round1_commit().unwrap();
-    let charlie_commitment = _charlie_participant.round1_commit().unwrap();
+    let charlie_commitment = charlie_participant.round1_commit().unwrap();
+    coordinator.add_commitment(alice_commitment.clone()).unwrap();
+    coordinator.add_commitment(bob_commitment.clone()).unwrap();
+    // Coordinator can accept commitments from all members
+    coordinator.add_commitment(charlie_commitment).unwrap();
+    // Idempotent re-send should be accepted silently
     coordinator.add_commitment(alice_commitment).unwrap();
-    coordinator.add_commitment(bob_commitment).unwrap();
-    // coordinator.add_commitment(charlie_commitment).unwrap();
 
     // Coordinator compiles a signing package and distributes it to selected participants
-    let signing_package = coordinator.signing_package().unwrap();
+    // Select a threshold roster for this ceremony (2-of-3): Alice, Bob
+    let signing_package = coordinator
+        .signing_package_for(&[alice_doc.xid(), bob_doc.xid()])
+        .unwrap();
 
     // Round-2: each selected participant produces their signature share locally and sends it back
     let alice_share = alice_participant.round2_sign(&group, &signing_package).unwrap();
     let bob_share = bob_participant.round2_sign(&group, &signing_package).unwrap();
+    coordinator.add_share(alice_share.clone()).unwrap();
+    coordinator.add_share(bob_share.clone()).unwrap();
+    // Idempotent re-send should be accepted silently
     coordinator.add_share(alice_share).unwrap();
-    coordinator.add_share(bob_share).unwrap();
 
     // Coordinator aggregates shares and attaches the final signature to the message
     let signed_envelope = coordinator.finalize().unwrap();
