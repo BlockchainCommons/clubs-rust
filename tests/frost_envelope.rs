@@ -38,35 +38,34 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     coordinator
         .add_commitment(alice_commitment.clone())
         .unwrap();
-
-        let bob_commitment = bob_participant.round1_commit(session_id).unwrap();
-    coordinator.add_commitment(bob_commitment.clone()).unwrap();
-
-    let charlie_commitment = charlie_participant.round1_commit(session_id).unwrap();
-    coordinator.add_commitment(charlie_commitment).unwrap();
     // Idempotent re-send should be accepted silently
     coordinator.add_commitment(alice_commitment).unwrap();
+
+    let bob_commitment = bob_participant.round1_commit(session_id).unwrap();
+    coordinator.add_commitment(bob_commitment.clone()).unwrap();
+
+    let charlie_commitment =
+        charlie_participant.round1_commit(session_id).unwrap();
+    coordinator.add_commitment(charlie_commitment).unwrap();
 
     // Coordinator records explicit consent after participants review the message
     coordinator.record_consent(alice_doc.xid()).unwrap();
     coordinator.record_consent(bob_doc.xid()).unwrap();
-    // Coordinator compiles a signing package and distributes it to selected participants
-    // Select a threshold roster for this ceremony (2-of-3): Alice, Bob (both consented)
-    let signing_package = coordinator
-        .signing_package_for(&[alice_doc.xid(), bob_doc.xid()])
-        .unwrap();
+    // Coordinator compiles a signing package from the consenting roster
+    let signing_package = coordinator.signing_package_from_consent().unwrap();
 
     // Round-2: each selected participant produces their signature share locally and sends it back
     let alice_share = alice_participant
         .round2_sign(&group, &signing_package)
         .unwrap();
+    coordinator.add_share(alice_share.clone()).unwrap();
+    // Idempotent re-send should be accepted silently
+    coordinator.add_share(alice_share).unwrap();
+
     let bob_share = bob_participant
         .round2_sign(&group, &signing_package)
         .unwrap();
-    coordinator.add_share(alice_share.clone()).unwrap();
     coordinator.add_share(bob_share.clone()).unwrap();
-    // Idempotent re-send should be accepted silently
-    coordinator.add_share(alice_share).unwrap();
 
     // Coordinator aggregates shares and attaches the final signature to the message
     let signed_envelope = coordinator.finalize().unwrap();
