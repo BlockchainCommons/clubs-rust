@@ -44,7 +44,7 @@ pub fn build_signing_package(
 
 impl From<FrostSigningCommitment> for Envelope {
     fn from(value: FrostSigningCommitment) -> Self {
-        let mut e = Envelope::new("FrostSigningCommitment");
+        let mut e = Envelope::new(known_values::UNIT);
         e = e.add_assertion(HOLDER, value.xid);
         e = e.add_assertion("hiding", CBOR::to_byte_string(value.hiding));
         e = e.add_assertion("binding", CBOR::to_byte_string(value.binding));
@@ -55,10 +55,11 @@ impl From<FrostSigningCommitment> for Envelope {
 impl TryFrom<Envelope> for FrostSigningCommitment {
     type Error = anyhow::Error;
     fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
-        // Validate subject
-        let subj: String = envelope.subject().try_leaf()?.try_into()?;
-        if subj != "FrostSigningCommitment" {
-            anyhow::bail!("unexpected subject: {}", subj);
+        // Validate subject is Unit
+        let subj_env = envelope.subject();
+        let kv = subj_env.try_known_value()?;
+        if kv.value() != known_values::UNIT.value() {
+            anyhow::bail!("unexpected subject for FrostSigningCommitment");
         }
         let xid_env = envelope.object_for_predicate(HOLDER)?;
         let xid: XID = xid_env.try_leaf()?.try_into()?;
@@ -82,7 +83,7 @@ impl TryFrom<Envelope> for FrostSigningCommitment {
 
 impl From<FrostSigningPackage> for Envelope {
     fn from(value: FrostSigningPackage) -> Self {
-        let mut e = Envelope::new("FrostSigningPackage");
+        let mut e = Envelope::new(known_values::UNIT);
         e = e.add_assertion(
             "message",
             CBOR::to_byte_string(value.message.clone()),
@@ -99,9 +100,10 @@ impl From<FrostSigningPackage> for Envelope {
 impl TryFrom<Envelope> for FrostSigningPackage {
     type Error = anyhow::Error;
     fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
-        let subj: String = envelope.subject().try_leaf()?.try_into()?;
-        if subj != "FrostSigningPackage" {
-            anyhow::bail!("unexpected subject: {}", subj);
+        let subj_env = envelope.subject();
+        let kv = subj_env.try_known_value()?;
+        if kv.value() != known_values::UNIT.value() {
+            anyhow::bail!("unexpected subject for FrostSigningPackage");
         }
         let msg_env = envelope.object_for_predicate("message")?;
         let message = msg_env.try_leaf()?.try_byte_string()?.to_vec();
@@ -125,7 +127,7 @@ impl TryFrom<Envelope> for FrostSigningPackage {
 
 impl From<FrostSignatureShare> for Envelope {
     fn from(value: FrostSignatureShare) -> Self {
-        let mut e = Envelope::new("FrostSignatureShare");
+        let mut e = Envelope::new(known_values::UNIT);
         e = e.add_assertion(HOLDER, value.xid);
         e = e.add_assertion("share", CBOR::to_byte_string(value.share.clone()));
         e
@@ -135,9 +137,10 @@ impl From<FrostSignatureShare> for Envelope {
 impl TryFrom<Envelope> for FrostSignatureShare {
     type Error = anyhow::Error;
     fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
-        let subj: String = envelope.subject().try_leaf()?.try_into()?;
-        if subj != "FrostSignatureShare" {
-            anyhow::bail!("unexpected subject: {}", subj);
+        let subj_env = envelope.subject();
+        let kv = subj_env.try_known_value()?;
+        if kv.value() != known_values::UNIT.value() {
+            anyhow::bail!("unexpected subject for FrostSignatureShare");
         }
         let xid_env = envelope.object_for_predicate(HOLDER)?;
         let xid: XID = xid_env.try_leaf()?.try_into()?;
@@ -149,7 +152,7 @@ impl TryFrom<Envelope> for FrostSignatureShare {
 
 impl From<FrostSignatureShares> for Envelope {
     fn from(value: FrostSignatureShares) -> Self {
-        let mut e = Envelope::new("FrostSignatureShares");
+        let mut e = Envelope::new(known_values::UNIT);
         for s in value.shares {
             let se: Envelope = s.into();
             let assertion = Envelope::new_assertion("share", se);
@@ -162,9 +165,10 @@ impl From<FrostSignatureShares> for Envelope {
 impl TryFrom<Envelope> for FrostSignatureShares {
     type Error = anyhow::Error;
     fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
-        let subj: String = envelope.subject().try_leaf()?.try_into()?;
-        if subj != "FrostSignatureShares" {
-            anyhow::bail!("unexpected subject: {}", subj);
+        let subj_env = envelope.subject();
+        let kv = subj_env.try_known_value()?;
+        if kv.value() != known_values::UNIT.value() {
+            anyhow::bail!("unexpected subject for FrostSignatureShares");
         }
         let mut shares: Vec<FrostSignatureShare> = Vec::new();
         for assertion in envelope.assertions() {
@@ -203,7 +207,7 @@ mod tests {
         let env: Envelope = commit.clone().into();
         #[rustfmt::skip]
         let expected = (indoc! {r#"
-            "FrostSigningCommitment" [
+            '' [
                 "binding": Bytes(33)
                 "hiding": Bytes(33)
                 'holder': XID(00000000)
@@ -239,13 +243,13 @@ mod tests {
         let env: Envelope = pkg.clone().into();
         #[rustfmt::skip]
         let expected = (indoc! {r#"
-            "FrostSigningPackage" [
-                "commitment": "FrostSigningCommitment" [
+            '' [
+                "commitment": '' [
                     "binding": Bytes(33)
                     "hiding": Bytes(33)
                     'holder': XID(11111111)
                 ]
-                "commitment": "FrostSigningCommitment" [
+                "commitment": '' [
                     "binding": Bytes(33)
                     "hiding": Bytes(33)
                     'holder': XID(22222222)
@@ -255,7 +259,12 @@ mod tests {
         "#}).trim();
         assert_eq!(env.format(), expected);
         let rt = FrostSigningPackage::try_from(env).unwrap();
-        assert_eq!(pkg, rt);
+        assert_eq!(pkg.message, rt.message);
+        let mut a = pkg.commitments.clone();
+        let mut b = rt.commitments.clone();
+        a.sort_by_key(|c| c.xid);
+        b.sort_by_key(|c| c.xid);
+        assert_eq!(a, b);
     }
 
     #[test]
@@ -267,7 +276,7 @@ mod tests {
         let env: Envelope = share.clone().into();
         #[rustfmt::skip]
         let expected = (indoc! {r#"
-            "FrostSignatureShare" [
+            '' [
                 "share": Bytes(3)
                 'holder': XID(aaaaaaaa)
             ]
@@ -291,12 +300,12 @@ mod tests {
         let env: Envelope = shares.clone().into();
         #[rustfmt::skip]
         let expected = (indoc! {r#"
-            "FrostSignatureShares" [
-                "share": "FrostSignatureShare" [
+            '' [
+                "share": '' [
                     "share": Bytes(2)
                     'holder': XID(bbbbbbbb)
                 ]
-                "share": "FrostSignatureShare" [
+                "share": '' [
                     "share": Bytes(2)
                     'holder': XID(cccccccc)
                 ]

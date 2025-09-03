@@ -24,14 +24,15 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     let base = Envelope::new("FROST demo")
         .add_assertion("note", "This is an assertion on the subject.");
     let wrapped = base.wrap();
-    // --- Build FROSTGroup using Gordian analogs and Trusted Dealer ---
+    // --- Build FrostGroup using Gordian analogs and Trusted Dealer ---
     let members = vec![alice_doc.xid(), bob_doc.xid(), charlie_doc.xid()];
     let (group, mut participants) =
         FrostGroup::new_with_trusted_dealer(2, members).unwrap();
 
     // Round-1: each selected participant generates commitments locally
     let mut commitments = Vec::new();
-    for xid in [alice_doc.xid(), bob_doc.xid()] {
+    let roster = [alice_doc.xid(), bob_doc.xid()];
+    for xid in roster {
         let c = participants.get_mut(&xid).unwrap().round1_commit().unwrap();
         commitments.push(c);
     }
@@ -40,7 +41,7 @@ fn frost_two_of_three_signs_envelope_and_verify() {
 
     // Round-2: each selected participant produces their signature share locally
     let mut shares_vec = Vec::new();
-    for xid in [alice_doc.xid(), bob_doc.xid()] {
+    for xid in roster {
         let s = participants
             .get(&xid)
             .unwrap()
@@ -54,5 +55,3 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     assert!(signed_wrapped.has_signature_from(&signing_key).unwrap());
     signed_wrapped.verify_signature_from(&signing_key).unwrap();
 }
-
-// (Helper moved into clubs::frost module).
