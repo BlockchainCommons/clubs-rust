@@ -87,6 +87,7 @@ impl FrostPublicKeyPackage {
 pub struct FrostGroup {
     pub threshold: usize,
     pub members: Vec<XID>,
+    verifying_key: SigningPublicKey,
     pub(super) pubkey_package: FrostPublicKeyPackage,
     id_map: BTreeMap<XID, Identifier>,
 }
@@ -98,12 +99,11 @@ impl FrostGroup {
         pubkey_package: FrostPublicKeyPackage,
         id_map: BTreeMap<XID, Identifier>,
     ) -> Self {
-        Self { threshold, members, pubkey_package, id_map }
+        let verifying_key = pubkey_package.verifying_signing_key();
+        Self { threshold, members, verifying_key, pubkey_package, id_map }
     }
 
-    pub fn verifying_signing_key(&self) -> SigningPublicKey {
-        self.pubkey_package.verifying_signing_key()
-    }
+    pub fn verifying_signing_key(&self) -> SigningPublicKey { self.verifying_key.clone() }
 
     pub(super) fn id_for_xid(&self, xid: &XID) -> Result<Identifier> {
         self.id_map
