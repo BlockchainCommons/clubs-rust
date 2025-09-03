@@ -1,0 +1,104 @@
+use bc_envelope::prelude::*;
+
+use super::commitment::FrostSigningCommitment;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FrostSigningPackage {
+    pub(crate) message: Vec<u8>,
+    pub(crate) commitments: Vec<FrostSigningCommitment>,
+}
+
+pub fn build_signing_package(
+    envelope: &Envelope,
+    commitments: Vec<FrostSigningCommitment>,
+) -> FrostSigningPackage {
+    let subj = envelope.subject();
+    let d = subj.digest();
+    let message = d.as_ref().data().to_vec();
+    FrostSigningPackage { message, commitments }
+}
+
+impl From<FrostSigningPackage> for Envelope {
+    fn from(value: FrostSigningPackage) -> Self {
+        let mut e = Envelope::new(known_values::UNIT);
+        e = e.add_assertion("message", CBOR::to_byte_string(value.message.clone()));
+        for c in value.commitments {
+            let ce: Envelope = c.into();
+            let assertion = Envelope::new_assertion("commitment", ce);
+            e = e.add_assertion_envelope(assertion).unwrap();
+        }
+        e
+    }
+}
+
+impl TryFrom<Envelope> for FrostSigningPackage {
+    type Error = anyhow::Error;
+    fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
+        let subj_env = envelope.subject();
+        let kv = subj_env.try_known_value()?;
+        if kv.value() != known_values::UNIT.value() {
+            anyhow::bail!("unexpected subject for FrostSigningPackage");
+        }
+        let msg_env = envelope.object_for_predicate("message")?;
+        let message = msg_env.try_leaf()?.try_byte_string()?.to_vec();
+        let mut commitments: Vec<FrostSigningCommitment> = Vec::new();
+        for assertion in envelope.assertions() {
+            let pred_env = assertion.try_predicate()?;
+            if let Ok(pred) = pred_env.try_leaf() {
+                if let Ok(name) = <String as TryFrom<_>>::try_from(pred.clone()) {
+                    if name == "commitment" {
+                        let obj_env = assertion.try_object()?;
+                        let c = FrostSigningCommitment::try_from(obj_env)?;
+                        commitments.push(c);
+                    }
+                }
+            }
+        }
+        Ok(FrostSigningPackage { message, commitments })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indoc::indoc;
+
+    #[test]
+    fn frost_signing_package_roundtrip_text() {
+        let xid1 = bc_components::XID::from_hex(
+            "1111111111111111111111111111111111111111111111111111111111111111",
+        );
+        let xid2 = bc_components::XID::from_hex(
+            "2222222222222222222222222222222222222222222222222222222222222222",
+        );
+        let c1 = FrostSigningCommitment { xid: xid1, hiding: [1; 33], binding: [2; 33] };
+        let c2 = FrostSigningCommitment { xid: xid2, hiding: [3; 33], binding: [4; 33] };
+        let pkg = FrostSigningPackage { message: vec![0xDE, 0xAD, 0xBE, 0xEF], commitments: vec![c1.clone(), c2.clone()] };
+        let env: Envelope = pkg.clone().into();
+        #[rustfmt::skip]
+        let expected = (indoc! {r#"
+            '' [
+                "commitment": '' [
+                    "binding": Bytes(33)
+                    "hiding": Bytes(33)
+                    'holder': XID(11111111)
+                ]
+                "commitment": '' [
+                    "binding": Bytes(33)
+                    "hiding": Bytes(33)
+                    'holder': XID(22222222)
+                ]
+                "message": Bytes(4)
+            ]
+        "#}).trim();
+        assert_eq!(env.format(), expected);
+        let rt = FrostSigningPackage::try_from(env).unwrap();
+        assert_eq!(pkg.message, rt.message);
+        let mut a = pkg.commitments.clone();
+        let mut b = rt.commitments.clone();
+        a.sort_by_key(|c| c.xid);
+        b.sort_by_key(|c| c.xid);
+        assert_eq!(a, b);
+    }
+}
+

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::{Result as AnyResult, anyhow};
+use anyhow::{Result, anyhow};
 use bc_components::{SigningPublicKey, XID};
 use frost_secp256k1_tr::{self as frost, Identifier};
 use rand::rngs::OsRng;
@@ -25,7 +25,7 @@ impl FrostPublicKeyPackage {
 
     pub(super) fn from_frost(
         pkg: &frost_secp256k1_tr::keys::PublicKeyPackage,
-    ) -> AnyResult<Self> {
+    ) -> Result<Self> {
         use anyhow::{anyhow, bail};
 
         let vkey = pkg
@@ -57,7 +57,7 @@ impl FrostPublicKeyPackage {
 
     pub(super) fn to_frost(
         &self,
-    ) -> AnyResult<frost_secp256k1_tr::keys::PublicKeyPackage> {
+    ) -> Result<frost_secp256k1_tr::keys::PublicKeyPackage> {
         use anyhow::anyhow;
         use frost_secp256k1_tr::{VerifyingKey, keys::VerifyingShare};
 
@@ -105,7 +105,7 @@ impl FrostGroup {
         self.pubkey_package.verifying_signing_key()
     }
 
-    pub(super) fn id_for_xid(&self, xid: &XID) -> AnyResult<Identifier> {
+    pub(super) fn id_for_xid(&self, xid: &XID) -> Result<Identifier> {
         self.id_map
             .get(xid)
             .cloned()
@@ -114,7 +114,7 @@ impl FrostGroup {
 
     pub(super) fn to_frost_public_key_package(
         &self,
-    ) -> AnyResult<frost_secp256k1_tr::keys::PublicKeyPackage> {
+    ) -> Result<frost_secp256k1_tr::keys::PublicKeyPackage> {
         self.pubkey_package.to_frost()
     }
 
@@ -124,7 +124,7 @@ impl FrostGroup {
     pub fn new_with_trusted_dealer(
         threshold: usize,
         members: Vec<XID>,
-    ) -> AnyResult<(Self, BTreeMap<XID, FrostParticipant>)> {
+    ) -> Result<(Self, BTreeMap<XID, FrostParticipant>)> {
         let max = members.len() as u16;
         let min = threshold as u16;
         // Assign Identifiers internally in order 1..=n

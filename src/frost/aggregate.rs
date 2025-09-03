@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::{Result as AnyResult, anyhow, bail};
+use anyhow::{Result, anyhow, bail};
 use bc_components::{Signature, SigningPublicKey};
 use bc_envelope::prelude::*;
 use frost_secp256k1_tr::round1::{NonceCommitment, SigningCommitments};
@@ -16,7 +16,7 @@ pub fn attach_preaggregated_signature(
     envelope: &Envelope,
     group: &FrostGroup,
     schnorr_sig64: &[u8; 64],
-) -> AnyResult<(Envelope, SigningPublicKey)> {
+) -> Result<(Envelope, SigningPublicKey)> {
     // Signatures attach as assertions on the subject; derive message
     let subj = envelope.subject();
     let subject_digest = subj.digest();
@@ -40,7 +40,7 @@ pub fn aggregate_and_attach_signature(
     group: &FrostGroup,
     signing_package_g: &FrostSigningPackage,
     shares_g: &FrostSignatureShares,
-) -> AnyResult<(Envelope, SigningPublicKey)> {
+) -> Result<(Envelope, SigningPublicKey)> {
     // Convert group public key package
     let frost_pkg = group.to_frost_public_key_package()?;
     // Convert signing package

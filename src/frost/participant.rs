@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::{Result as AnyResult, anyhow};
+use anyhow::{Result, anyhow};
 use bc_components::XID;
 use frost_secp256k1_tr::{
     self as frost, Identifier,
@@ -35,7 +35,7 @@ impl FrostParticipant {
 
     /// Perform Round-1 locally: generate nonces and commitments. Stores nonces
     /// for Round-2.
-    pub fn round1_commit(&mut self) -> AnyResult<FrostSigningCommitment> {
+    pub fn round1_commit(&mut self) -> Result<FrostSigningCommitment> {
         let (nonces, comms) =
             frost::round1::commit(self.key_package.signing_share(), &mut OsRng);
         self.nonces = Some(nonces);
@@ -59,7 +59,7 @@ impl FrostParticipant {
         &self,
         group: &FrostGroup,
         signing_pkg: &FrostSigningPackage,
-    ) -> AnyResult<FrostSignatureShare> {
+    ) -> Result<FrostSignatureShare> {
         let nonces = self.nonces.as_ref().ok_or_else(|| {
             anyhow!(
                 "round1_commit must be called before round2_sign for signer {}",
