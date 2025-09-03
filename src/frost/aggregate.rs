@@ -5,13 +5,13 @@ use bc_components::{Signature, SigningPublicKey};
 use bc_envelope::prelude::*;
 use frost_secp256k1_tr::round1::{NonceCommitment, SigningCommitments};
 
-use super::group::FrostGroup;
+use super::group::FROSTGroup;
 use super::signing::{FrostSignatureSharesG, FrostSigningPackageG};
 
 /// Attach a pre-aggregated BIP-340 signature to the envelope and verify with the group's public key.
 pub fn attach_preaggregated_signature(
     envelope: &Envelope,
-    group: &FrostGroup,
+    group: &FROSTGroup,
     schnorr_sig64: &[u8; 64],
 ) -> AnyResult<(Envelope, SigningPublicKey)> {
     // Signatures attach as assertions on the subject; derive message
@@ -33,7 +33,7 @@ pub fn attach_preaggregated_signature(
 
 pub fn aggregate_and_attach_signature(
     envelope: &Envelope,
-    group: &FrostGroup,
+    group: &FROSTGroup,
     signing_package_g: &FrostSigningPackageG,
     shares_g: &FrostSignatureSharesG,
 ) -> AnyResult<(Envelope, SigningPublicKey)> {
@@ -44,8 +44,8 @@ pub fn aggregate_and_attach_signature(
         frost_secp256k1_tr::Identifier,
         frost_secp256k1_tr::round1::SigningCommitments,
     > = BTreeMap::new();
-    for (xid, c) in &signing_package_g.commitments {
-        let id = group.id_for_xid(xid)?;
+    for c in &signing_package_g.commitments {
+        let id = group.id_for_xid(&c.xid)?;
         let hiding = NonceCommitment::deserialize(&c.hiding)
             .map_err(|e| anyhow!("deserialize hiding commitment: {e}"))?;
         let binding = NonceCommitment::deserialize(&c.binding)
@@ -62,9 +62,9 @@ pub fn aggregate_and_attach_signature(
         frost_secp256k1_tr::Identifier,
         frost_secp256k1_tr::round2::SignatureShare,
     > = BTreeMap::new();
-    for (xid, sbytes) in &shares_g.shares {
-        let id = group.id_for_xid(xid)?;
-        let share = frost_secp256k1_tr::round2::SignatureShare::deserialize(sbytes)
+    for share in &shares_g.shares {
+        let id = group.id_for_xid(&share.xid)?;
+        let share = frost_secp256k1_tr::round2::SignatureShare::deserialize(&share.share)
             .map_err(|e| anyhow!("deserialize signature share: {e}"))?;
         frost_shares.insert(id, share);
     }

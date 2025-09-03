@@ -71,14 +71,14 @@ impl FrostPublicKeyPackage {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FrostGroup {
+pub struct FROSTGroup {
     pub threshold: usize,
     pub members: Vec<XID>,
     pub(super) pubkey_package: FrostPublicKeyPackage,
     id_map: BTreeMap<XID, Identifier>,
 }
 
-impl FrostGroup {
+impl FROSTGroup {
     pub(super) fn new(
         threshold: usize,
         members: Vec<XID>,
@@ -140,7 +140,7 @@ impl FrostGroup {
         }
 
         let pubkey_pkg = FrostPublicKeyPackage::from_frost(&public_key_package)?;
-        let group = FrostGroup::new(threshold, members, pubkey_pkg, id_map);
+        let group = FROSTGroup::new(threshold, members, pubkey_pkg, id_map);
 
         Ok((group, participants))
     }

@@ -6,8 +6,8 @@ use frost_secp256k1_tr::{self as frost, Identifier};
 use frost_secp256k1_tr::round1::{NonceCommitment, SigningCommitments};
 use rand::rngs::OsRng;
 
-use super::group::FrostGroup;
-use super::signing::{FrostSigningCommitmentSec1, FrostSigningPackageG};
+use super::group::FROSTGroup;
+use super::signing::{FrostSigningCommitment, FrostSignatureShare, FrostSigningPackageG};
 
 pub struct FrostParticipant {
     xid: XID,
@@ -24,7 +24,7 @@ impl FrostParticipant {
     pub fn xid(&self) -> XID { self.xid }
 
     /// Perform Round-1 locally: generate nonces and commitments. Stores nonces for Round-2.
-    pub fn round1_commit(&mut self) -> AnyResult<FrostSigningCommitmentSec1> {
+pub fn round1_commit(&mut self) -> AnyResult<FrostSigningCommitment> {
         let (nonces, comms) = frost::round1::commit(self.key_package.signing_share(), &mut OsRng);
         self.nonces = Some(nonces);
         let hid = comms
@@ -39,11 +39,11 @@ impl FrostParticipant {
         h.copy_from_slice(&hid);
         let mut b = [0u8; 33];
         b.copy_from_slice(&bind);
-        Ok(FrostSigningCommitmentSec1 { hiding: h, binding: b })
+        Ok(FrostSigningCommitment { xid: self.xid, hiding: h, binding: b })
     }
 
     /// Perform Round-2 locally: produce a signature share using stored nonces.
-    pub fn round2_sign(&self, group: &FrostGroup, signing_pkg: &FrostSigningPackageG) -> AnyResult<Vec<u8>> {
+    pub fn round2_sign(&self, group: &FROSTGroup, signing_pkg: &FrostSigningPackageG) -> AnyResult<FrostSignatureShare> {
         let nonces = self
             .nonces
             .as_ref()
@@ -51,8 +51,8 @@ impl FrostParticipant {
 
         // Convert commitments to frost SigningPackage
         let mut frost_commitments: BTreeMap<Identifier, SigningCommitments> = BTreeMap::new();
-        for (xid, comm) in &signing_pkg.commitments {
-            let id = group.id_for_xid(xid)?;
+        for comm in &signing_pkg.commitments {
+            let id = group.id_for_xid(&comm.xid)?;
             let hiding = NonceCommitment::deserialize(&comm.hiding)
                 .map_err(|e| anyhow!("deserialize hiding: {e}"))?;
             let binding = NonceCommitment::deserialize(&comm.binding)
@@ -63,6 +63,6 @@ impl FrostParticipant {
 
         let share = frost::round2::sign(&frost_sp, nonces, &self.key_package)
             .map_err(|e| anyhow!("round2 sign failed for {}: {e}", self.xid))?;
-        Ok(share.serialize())
+        Ok(FrostSignatureShare { xid: self.xid, share: share.serialize() })
     }
 }

@@ -1,0 +1,22 @@
+We are working in this Rust workspace, but specifically on the crate called `clubs`.
+
+For minimal context, read these files:
+
+- clubs/docs/PublicKeyPermits.md
+- clubs/docs/dcbor-draft.md
+- clubs/docs/envelope-links.md
+- clubs/docs/XanaduToReality.md
+
+Also you will want to explore the APIs in these local crates:
+
+- dcbor/
+- bc-envelope/
+- bc-xid/
+- bc-components/
+- bc-ur/
+- known-values/
+- provenance-mark/
+
+Guidelines:
+
+- Run `cargo clippy` and fix any lints before you end each turn.
