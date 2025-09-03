@@ -24,10 +24,8 @@ pub struct FrostParticipant {
 impl FrostParticipant {
     pub fn new(
         xid: XID,
-        _identifier: Identifier,
         key_package: frost::keys::KeyPackage,
     ) -> Self {
-        let _ = _identifier; // not stored; identifiers are internal to group
         Self { xid, key_package, nonces: None }
     }
 

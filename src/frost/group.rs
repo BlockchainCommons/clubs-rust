@@ -157,7 +157,7 @@ impl FrostGroup {
             let xid = *rev
                 .get(id)
                 .ok_or_else(|| anyhow!("unknown identifier from dealer"))?;
-            participants.insert(xid, FrostParticipant::new(xid, *id, kp));
+            participants.insert(xid, FrostParticipant::new(xid, kp));
         }
 
         let pubkey_pkg =
