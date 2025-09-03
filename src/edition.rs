@@ -4,24 +4,24 @@
 //! construct an edition envelope with:
 //! - Public metadata: club XID, provenance mark
 //! - Encrypted content: symmetric key per-edition
-//! - Public-key permits: a `hasRecipient: SealedMessage` for each reader, optionally
-//!   annotated with the member XID
+//! - Public-key permits: a `hasRecipient: SealedMessage` for each reader,
+//!   optionally annotated with the member XID
 //!
 //! Notes
 //! - This is a sketch: error paths, validation, and parsing are intentionally
 //!   minimal and will evolve with the Club model.
 //! - Permit types beyond public-key (password, SSKR, etc.) are not modeled yet.
-//! - Write-group/threshold signing is represented via simple add-signature helpers.
+//! - Write-group/threshold signing is represented via simple add-signature
+//!   helpers.
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use bc_components::{
-    Digest, DigestProvider, PublicKeys, SSKRSpec, Signature, SymmetricKey,
+    Digest, DigestProvider, PublicKeys, SSKRSpec, Signature, SymmetricKey, XID,
 };
 use bc_envelope::prelude::*;
-use bc_components::XID;
 use known_values::{
-    CONTENT, CONTENT_RAW, HAS_RECIPIENT_RAW, HOLDER, PROVENANCE, PROVENANCE_RAW,
-    SIGNED, SIGNED_RAW,
+    CONTENT, CONTENT_RAW, HAS_RECIPIENT_RAW, HOLDER, PROVENANCE,
+    PROVENANCE_RAW, SIGNED, SIGNED_RAW,
 };
 use provenance_mark::ProvenanceMark;
 
@@ -31,9 +31,15 @@ use provenance_mark::ProvenanceMark;
 #[derive(Clone, Debug, PartialEq)]
 pub enum PublicKeyPermit {
     /// Encode variant: used when creating a new edition.
-    Encode { recipient: PublicKeys, member_xid: Option<XID> },
+    Encode {
+        recipient: PublicKeys,
+        member_xid: Option<XID>,
+    },
     /// Decode variant: used when round-tripping from an existing envelope.
-    Decode { sealed: bc_components::SealedMessage, member_xid: Option<XID> },
+    Decode {
+        sealed: bc_components::SealedMessage,
+        member_xid: Option<XID>,
+    },
 }
 
 impl PublicKeyPermit {
@@ -44,7 +50,10 @@ impl PublicKeyPermit {
     pub fn with_member_xid(self, member_xid: XID) -> Self {
         match self {
             PublicKeyPermit::Encode { recipient, .. } => {
-                PublicKeyPermit::Encode { recipient, member_xid: Some(member_xid) }
+                PublicKeyPermit::Encode {
+                    recipient,
+                    member_xid: Some(member_xid),
+                }
             }
             PublicKeyPermit::Decode { sealed, .. } => {
                 PublicKeyPermit::Decode { sealed, member_xid: Some(member_xid) }
@@ -52,7 +61,6 @@ impl PublicKeyPermit {
         }
     }
 }
-
 
 /// A single edition (revision) of a Club's content.
 #[derive(Clone, Debug, PartialEq)]
@@ -63,16 +71,28 @@ pub struct Edition {
     pub provenance: ProvenanceMark,
     /// Plaintext content to be sealed into this edition.
     pub content: Envelope,
-    /// Collected signatures on this edition (subject-level signatures by default).
+    /// Collected signatures on this edition (subject-level signatures by
+    /// default).
     pub signatures: Vec<Signature>,
     /// Public-key permits attached to the edition.
     pub permits: Vec<PublicKeyPermit>,
 }
 
 impl Edition {
-    /// Create a new Edition for a Club with plaintext content and a provenance mark.
-    pub fn new(club: XID, provenance: ProvenanceMark, content: Envelope) -> Self {
-        Self { club, provenance, content, signatures: Vec::new(), permits: Vec::new() }
+    /// Create a new Edition for a Club with plaintext content and a provenance
+    /// mark.
+    pub fn new(
+        club: XID,
+        provenance: ProvenanceMark,
+        content: Envelope,
+    ) -> Self {
+        Self {
+            club,
+            provenance,
+            content,
+            signatures: Vec::new(),
+            permits: Vec::new(),
+        }
     }
 
     /// Build the unsigned, unsealed public metadata envelope for this edition.
@@ -84,8 +104,8 @@ impl Edition {
 
         e = e.add_assertion(PROVENANCE, self.provenance.clone());
 
-        // Include plaintext content (helpful for pre-seal transforms). Consumers
-        // should use the sealed variant for distribution.
+        // Include plaintext content (helpful for pre-seal transforms).
+        // Consumers should use the sealed variant for distribution.
         let mut e = e.add_assertion(CONTENT, self.content.clone());
         // Include any stored signatures.
         for sig in &self.signatures {
@@ -94,7 +114,10 @@ impl Edition {
         // Include decode-variant permits to maintain idempotence.
         for permit in &self.permits {
             if let PublicKeyPermit::Decode { sealed, member_xid } = permit {
-                let mut assertion = Envelope::new_assertion(known_values::HAS_RECIPIENT, sealed.clone());
+                let mut assertion = Envelope::new_assertion(
+                    known_values::HAS_RECIPIENT,
+                    sealed.clone(),
+                );
                 if let Some(xid) = member_xid {
                     assertion = assertion.add_assertion(HOLDER, *xid);
                 }
@@ -110,7 +133,8 @@ impl Edition {
         self.to_unsigned_envelope().digest().into_owned()
     }
 
-    /// Seal the content with optional permits (public-key and/or SSKR), and sign.
+    /// Seal the content with optional permits (public-key and/or SSKR), and
+    /// sign.
     ///
     /// - If no permits are provided, the content remains plaintext but the
     ///   edition is still signed.
@@ -150,21 +174,26 @@ impl Edition {
                             recipient,
                             Some(edition_id_aad.as_slice()),
                         );
-                        let mut assertion =
-                            Envelope::new_assertion(known_values::HAS_RECIPIENT, sealed);
+                        let mut assertion = Envelope::new_assertion(
+                            known_values::HAS_RECIPIENT,
+                            sealed,
+                        );
                         if let Some(xid) = member_xid {
                             assertion = assertion.add_assertion(HOLDER, *xid);
                         }
                         edition = edition.add_assertion_envelope(assertion)?;
                     }
                     PublicKeyPermit::Decode { .. } => {
-                        bail!("Cannot use decode permit when sealing a new edition");
+                        bail!(
+                            "Cannot use decode permit when sealing a new edition"
+                        );
                     }
                 }
             }
 
             if let Some(spec) = sskr_spec.as_ref() {
-                sskr_shares = Some(encrypted_content.sskr_split(spec, &content_key)?);
+                sskr_shares =
+                    Some(encrypted_content.sskr_split(spec, &content_key)?);
             }
         } else {
             // Leave content plaintext.
@@ -181,7 +210,10 @@ pub mod permit {
     use super::*;
 
     /// Build a permit for a recipient with optional member XID annotation.
-    pub fn for_member(member_xid: XID, public_keys: &PublicKeys) -> PublicKeyPermit {
+    pub fn for_member(
+        member_xid: XID,
+        public_keys: &PublicKeys,
+    ) -> PublicKeyPermit {
         PublicKeyPermit::new(public_keys.clone()).with_member_xid(member_xid)
     }
 
@@ -233,30 +265,44 @@ impl TryFrom<Envelope> for Edition {
                     }
                 }
                 HAS_RECIPIENT_RAW => {
-                    // Decode permit: extract sealed message and optional holder XID.
+                    // Decode permit: extract sealed message and optional holder
+                    // XID.
                     if !obj.is_obscured() {
-                        let sealed = obj.extract_subject::<bc_components::SealedMessage>()?;
-                        // Find optional holder assertion(s) on the permit assertion envelope.
+                        let sealed = obj
+                            .extract_subject::<bc_components::SealedMessage>(
+                            )?;
+                        // Find optional holder assertion(s) on the permit
+                        // assertion envelope.
                         let holder_xid: Option<XID> = match assertion
                             .optional_assertion_with_predicate(HOLDER)?
                         {
                             Some(holder_assertion) => {
-                                let holder_obj = holder_assertion.try_object()?;
-                                let xid: XID = holder_obj.try_leaf()?.try_into()?;
+                                let holder_obj =
+                                    holder_assertion.try_object()?;
+                                let xid: XID =
+                                    holder_obj.try_leaf()?.try_into()?;
                                 Some(xid)
                             }
                             None => None,
                         };
                         // Push permit with optional holder
-                        let p = PublicKeyPermit::Decode { sealed, member_xid: holder_xid };
+                        let p = PublicKeyPermit::Decode {
+                            sealed,
+                            member_xid: holder_xid,
+                        };
                         permits.push(p);
                     }
                 }
-                _ => return Err(anyhow!("Unexpected predicate in Edition envelope")),
+                _ => {
+                    return Err(anyhow!(
+                        "Unexpected predicate in Edition envelope"
+                    ));
+                }
             }
         }
 
-        let provenance = provenance.ok_or_else(|| anyhow!("Missing provenance"))?;
+        let provenance =
+            provenance.ok_or_else(|| anyhow!("Missing provenance"))?;
         let content = content.ok_or_else(|| anyhow!("Missing content"))?;
 
         Ok(Edition { club, provenance, content, signatures, permits })

@@ -9,3 +9,4 @@
 - [Signatures with Metadata in Gordian Envelope](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2024-009-signature-metadata.md)
 - [Permits in Gordian Envelope](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2025-004-permit.md)
 - [Blockchain Commons Research Repository](https://github.com/blockchainCommons/research)
+- [Known Values: A Compact, Deterministic Representation for Ontological Concepts](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2023-002-known-value.md)

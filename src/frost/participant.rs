@@ -1,31 +1,43 @@
-use anyhow::{anyhow, Result as AnyResult};
 use std::collections::BTreeMap;
 
+use anyhow::{Result as AnyResult, anyhow};
 use bc_components::XID;
-use frost_secp256k1_tr::{self as frost, Identifier};
-use frost_secp256k1_tr::round1::{NonceCommitment, SigningCommitments};
+use frost_secp256k1_tr::{
+    self as frost, Identifier,
+    round1::{NonceCommitment, SigningCommitments},
+};
 use rand::rngs::OsRng;
 
-use super::group::FROSTGroup;
-use super::signing::{FrostSigningCommitment, FrostSignatureShare, FrostSigningPackageG};
+use super::{
+    group::FrostGroup,
+    signing::{
+        FrostSignatureShare, FrostSigningCommitment, FrostSigningPackage,
+    },
+};
 
 pub struct FrostParticipant {
     xid: XID,
-    _identifier: Identifier,
     key_package: frost::keys::KeyPackage,
     nonces: Option<frost::round1::SigningNonces>,
 }
 
 impl FrostParticipant {
-    pub fn new(xid: XID, identifier: Identifier, key_package: frost::keys::KeyPackage) -> Self {
-        Self { xid, _identifier: identifier, key_package, nonces: None }
+    pub fn new(
+        xid: XID,
+        _identifier: Identifier,
+        key_package: frost::keys::KeyPackage,
+    ) -> Self {
+        let _ = _identifier; // not stored; identifiers are internal to group
+        Self { xid, key_package, nonces: None }
     }
 
     pub fn xid(&self) -> XID { self.xid }
 
-    /// Perform Round-1 locally: generate nonces and commitments. Stores nonces for Round-2.
-pub fn round1_commit(&mut self) -> AnyResult<FrostSigningCommitment> {
-        let (nonces, comms) = frost::round1::commit(self.key_package.signing_share(), &mut OsRng);
+    /// Perform Round-1 locally: generate nonces and commitments. Stores nonces
+    /// for Round-2.
+    pub fn round1_commit(&mut self) -> AnyResult<FrostSigningCommitment> {
+        let (nonces, comms) =
+            frost::round1::commit(self.key_package.signing_share(), &mut OsRng);
         self.nonces = Some(nonces);
         let hid = comms
             .hiding()
@@ -43,26 +55,37 @@ pub fn round1_commit(&mut self) -> AnyResult<FrostSigningCommitment> {
     }
 
     /// Perform Round-2 locally: produce a signature share using stored nonces.
-    pub fn round2_sign(&self, group: &FROSTGroup, signing_pkg: &FrostSigningPackageG) -> AnyResult<FrostSignatureShare> {
-        let nonces = self
-            .nonces
-            .as_ref()
-            .ok_or_else(|| anyhow!("round1_commit must be called before round2_sign for signer {}", self.xid))?;
+    pub fn round2_sign(
+        &self,
+        group: &FrostGroup,
+        signing_pkg: &FrostSigningPackage,
+    ) -> AnyResult<FrostSignatureShare> {
+        let nonces = self.nonces.as_ref().ok_or_else(|| {
+            anyhow!(
+                "round1_commit must be called before round2_sign for signer {}",
+                self.xid
+            )
+        })?;
 
         // Convert commitments to frost SigningPackage
-        let mut frost_commitments: BTreeMap<Identifier, SigningCommitments> = BTreeMap::new();
+        let mut frost_commitments: BTreeMap<Identifier, SigningCommitments> =
+            BTreeMap::new();
         for comm in &signing_pkg.commitments {
             let id = group.id_for_xid(&comm.xid)?;
             let hiding = NonceCommitment::deserialize(&comm.hiding)
                 .map_err(|e| anyhow!("deserialize hiding: {e}"))?;
             let binding = NonceCommitment::deserialize(&comm.binding)
                 .map_err(|e| anyhow!("deserialize binding: {e}"))?;
-            frost_commitments.insert(id, SigningCommitments::new(hiding, binding));
+            frost_commitments
+                .insert(id, SigningCommitments::new(hiding, binding));
         }
-        let frost_sp = frost::SigningPackage::new(frost_commitments, &signing_pkg.message);
+        let frost_sp =
+            frost::SigningPackage::new(frost_commitments, &signing_pkg.message);
 
         let share = frost::round2::sign(&frost_sp, nonces, &self.key_package)
-            .map_err(|e| anyhow!("round2 sign failed for {}: {e}", self.xid))?;
+            .map_err(|e| {
+            anyhow!("round2 sign failed for {}: {e}", self.xid)
+        })?;
         Ok(FrostSignatureShare { xid: self.xid, share: share.serialize() })
     }
 }

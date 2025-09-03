@@ -2,8 +2,8 @@ use bc_components::XIDProvider;
 use bc_envelope::prelude::*;
 use bc_xid::XIDDocument;
 use clubs::frost::{
+    FrostGroup, FrostSignatureShares,
     aggregate_and_attach_signature as agg_attach, build_signing_package,
-    FrostSignatureSharesG, FROSTGroup,
 };
 
 #[test]
@@ -19,13 +19,15 @@ fn frost_two_of_three_signs_envelope_and_verify() {
         bc_components::PrivateKeyBase::new(),
     );
 
-    // --- Prepare an Envelope, then WRAP it so the signature covers the whole structure ---
+    // --- Prepare an Envelope, then WRAP it so the signature covers the whole
+    // structure ---
     let base = Envelope::new("FROST demo")
         .add_assertion("note", "This is an assertion on the subject.");
     let wrapped = base.wrap();
     // --- Build FROSTGroup using Gordian analogs and Trusted Dealer ---
     let members = vec![alice_doc.xid(), bob_doc.xid(), charlie_doc.xid()];
-    let (group, mut participants) = FROSTGroup::new_with_trusted_dealer(2, members).unwrap();
+    let (group, mut participants) =
+        FrostGroup::new_with_trusted_dealer(2, members).unwrap();
 
     // Round-1: each selected participant generates commitments locally
     let mut commitments = Vec::new();
@@ -39,10 +41,14 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     // Round-2: each selected participant produces their signature share locally
     let mut shares_vec = Vec::new();
     for xid in [alice_doc.xid(), bob_doc.xid()] {
-        let s = participants.get(&xid).unwrap().round2_sign(&group, &signing_package_g).unwrap();
+        let s = participants
+            .get(&xid)
+            .unwrap()
+            .round2_sign(&group, &signing_package_g)
+            .unwrap();
         shares_vec.push(s);
     }
-    let shares_g = FrostSignatureSharesG::new(shares_vec);
+    let shares_g = FrostSignatureShares::new(shares_vec);
     let (signed_wrapped, signing_key) =
         agg_attach(&wrapped, &group, &signing_package_g, &shares_g).unwrap();
     assert!(signed_wrapped.has_signature_from(&signing_key).unwrap());

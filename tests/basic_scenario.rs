@@ -1,15 +1,17 @@
-use bc_envelope::prelude::*;
 use bc_components::{
     PrivateKeyBase, PublicKeysProvider, SSKRGroupSpec, SSKRSpec, SymmetricKey,
     XIDProvider,
 };
+use bc_envelope::prelude::*;
 use bc_xid::XIDDocument;
-use clubs::edition::{permit, Edition, PublicKeyPermit};
+use clubs::edition::{Edition, PublicKeyPermit, permit};
 use indoc::indoc;
 use known_values::{CONTENT, NAME};
 use provenance_mark::{ProvenanceMarkGenerator, ProvenanceMarkResolution};
 
-fn fixed_key(byte: u8) -> PrivateKeyBase { PrivateKeyBase::from_data([byte; 32]) }
+fn fixed_key(byte: u8) -> PrivateKeyBase {
+    PrivateKeyBase::from_data([byte; 32])
+}
 
 #[test]
 fn basic_scenario_alice_bob_charlie() {
@@ -34,8 +36,10 @@ fn basic_scenario_alice_bob_charlie() {
         .add_assertion(NAME, "Gordian Test Club");
 
     // Provenance (deterministic).
-    let mut pm_gen =
-        ProvenanceMarkGenerator::new_with_passphrase(ProvenanceMarkResolution::Quartile, "ClubSeed");
+    let mut pm_gen = ProvenanceMarkGenerator::new_with_passphrase(
+        ProvenanceMarkResolution::Quartile,
+        "ClubSeed",
+    );
     let date = Date::from_string("2025-01-01").unwrap();
     let provenance = pm_gen.next(date, Some("Club genesis edition"));
 
@@ -56,8 +60,8 @@ fn basic_scenario_alice_bob_charlie() {
     assert_eq!(shares.len(), 1);
     assert_eq!(shares[0].len(), 3);
 
-    // Phase One: print and collect expected text, then replace with assert below.
-    // println!("{}", sealed.format());
+    // Phase One: print and collect expected text, then replace with assert
+    // below. println!("{}", sealed.format());
 
     // Phase Two: test against expected output.
     #[rustfmt::skip]
@@ -85,7 +89,8 @@ fn basic_scenario_alice_bob_charlie() {
     "#}).trim();
     assert_eq!(sealed.format(), expected);
 
-    // Round-trip: convert envelope back to Edition and examine its serialization.
+    // Round-trip: convert envelope back to Edition and examine its
+    // serialization.
     let edition_rt = Edition::try_from(sealed.clone()).unwrap();
     let roundtrip_env: Envelope = edition_rt.clone().into();
     #[rustfmt::skip]
@@ -128,9 +133,11 @@ fn basic_scenario_alice_bob_charlie() {
             break;
         }
     }
-    let content_key = content_key.expect("Alice should be able to unwrap content key");
+    let content_key =
+        content_key.expect("Alice should be able to unwrap content key");
     let encrypted_content = sealed.object_for_predicate(CONTENT).unwrap();
-    let decrypted_wrapped = encrypted_content.decrypt_subject(&content_key).unwrap();
+    let decrypted_wrapped =
+        encrypted_content.decrypt_subject(&content_key).unwrap();
     let decrypted_content = decrypted_wrapped.try_unwrap().unwrap();
     assert!(decrypted_content.is_identical_to(&content));
 

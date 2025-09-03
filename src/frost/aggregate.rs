@@ -1,17 +1,20 @@
-use anyhow::{anyhow, bail, Result as AnyResult};
 use std::collections::BTreeMap;
 
+use anyhow::{Result as AnyResult, anyhow, bail};
 use bc_components::{Signature, SigningPublicKey};
 use bc_envelope::prelude::*;
 use frost_secp256k1_tr::round1::{NonceCommitment, SigningCommitments};
 
-use super::group::FROSTGroup;
-use super::signing::{FrostSignatureSharesG, FrostSigningPackageG};
+use super::{
+    group::FrostGroup,
+    signing::{FrostSignatureShares, FrostSigningPackage},
+};
 
-/// Attach a pre-aggregated BIP-340 signature to the envelope and verify with the group's public key.
+/// Attach a pre-aggregated BIP-340 signature to the envelope and verify with
+/// the group's public key.
 pub fn attach_preaggregated_signature(
     envelope: &Envelope,
-    group: &FROSTGroup,
+    group: &FrostGroup,
     schnorr_sig64: &[u8; 64],
 ) -> AnyResult<(Envelope, SigningPublicKey)> {
     // Signatures attach as assertions on the subject; derive message
@@ -23,7 +26,8 @@ pub fn attach_preaggregated_signature(
     let signature = Signature::schnorr_from_data(*schnorr_sig64);
 
     // Verify using the group's SigningPublicKey
-    let signed = envelope.add_assertion(known_values::SIGNED, signature.clone());
+    let signed =
+        envelope.add_assertion(known_values::SIGNED, signature.clone());
     signed
         .verify_signature_from(&group.verifying_signing_key())
         .map_err(|e| anyhow!("envelope signature verification failed: {e}"))?;
@@ -33,9 +37,9 @@ pub fn attach_preaggregated_signature(
 
 pub fn aggregate_and_attach_signature(
     envelope: &Envelope,
-    group: &FROSTGroup,
-    signing_package_g: &FrostSigningPackageG,
-    shares_g: &FrostSignatureSharesG,
+    group: &FrostGroup,
+    signing_package_g: &FrostSigningPackage,
+    shares_g: &FrostSignatureShares,
 ) -> AnyResult<(Envelope, SigningPublicKey)> {
     // Convert group public key package
     let frost_pkg = group.to_frost_public_key_package()?;
@@ -64,13 +68,19 @@ pub fn aggregate_and_attach_signature(
     > = BTreeMap::new();
     for share in &shares_g.shares {
         let id = group.id_for_xid(&share.xid)?;
-        let share = frost_secp256k1_tr::round2::SignatureShare::deserialize(&share.share)
-            .map_err(|e| anyhow!("deserialize signature share: {e}"))?;
+        let share = frost_secp256k1_tr::round2::SignatureShare::deserialize(
+            &share.share,
+        )
+        .map_err(|e| anyhow!("deserialize signature share: {e}"))?;
         frost_shares.insert(id, share);
     }
 
-    let group_sig = frost_secp256k1_tr::aggregate(&signing_package, &frost_shares, &frost_pkg)
-        .map_err(|e| anyhow!("aggregate group signature failed: {e}"))?;
+    let group_sig = frost_secp256k1_tr::aggregate(
+        &signing_package,
+        &frost_shares,
+        &frost_pkg,
+    )
+    .map_err(|e| anyhow!("aggregate group signature failed: {e}"))?;
 
     // Convert aggregated signature to BIP-340 bytes
     let sig_vec = group_sig
@@ -82,6 +92,7 @@ pub fn aggregate_and_attach_signature(
     let mut sig_bytes = [0u8; 64];
     sig_bytes.copy_from_slice(&sig_vec);
 
-    // Use generic attach helper to affix the signature to the envelope and verify via Gordian stack
+    // Use generic attach helper to affix the signature to the envelope and
+    // verify via Gordian stack
     attach_preaggregated_signature(envelope, group, &sig_bytes)
 }
