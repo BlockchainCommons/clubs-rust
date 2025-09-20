@@ -135,8 +135,7 @@ impl FrostGroup {
                 debug_assert_eq!(sec1.len(), 33);
                 let mut xonly = [0u8; 32];
                 xonly.copy_from_slice(&sec1[1..]);
-                let schnorr_pk =
-                    SchnorrPublicKey::from_data(xonly);
+                let schnorr_pk = SchnorrPublicKey::from_data(xonly);
                 participant_keys
                     .insert(*xid, SigningPublicKey::from_schnorr(schnorr_pk));
             }

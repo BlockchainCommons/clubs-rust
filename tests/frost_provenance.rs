@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use bc_components::{PrivateKeyBase, XIDProvider, XID};
+use bc_components::{PrivateKeyBase, XID, XIDProvider};
 use bc_xid::XIDDocument;
 use clubs::frost::{
     FrostGroup, FrostParticipant,
@@ -24,7 +24,7 @@ struct Advance {
 struct PublishingState {
     resolution: ProvenanceMarkResolution,
     chain_id: Vec<u8>,
-    current_key: Vec<u8>,
+    last_key: Vec<u8>,
     ratchet_state: [u8; 32],
     sequence: u32,
     last_date: Date,
@@ -45,7 +45,7 @@ impl PublishingState {
         Ok(Self {
             resolution,
             chain_id: chain_id.clone(),
-            current_key: chain_id,
+            last_key: chain_id,
             ratchet_state,
             sequence: 0,
             last_date: genesis_date,
@@ -116,7 +116,7 @@ impl PublishingState {
 
         let mark = ProvenanceMark::new(
             self.resolution,
-            self.current_key.clone(),
+            self.last_key.clone(),
             next_key.clone(),
             self.chain_id.clone(),
             self.sequence,
@@ -126,7 +126,7 @@ impl PublishingState {
 
         let expanded_key = expand_mark_key(&next_key);
         self.ratchet_state = ratchet_state(&self.ratchet_state, &expanded_key);
-        self.current_key = next_key;
+        self.last_key = next_key;
         self.sequence += 1;
         self.last_date = date;
 

@@ -37,13 +37,27 @@ fn derive_chain_id(
 }
 
 pub struct FrostProvenanceChain {
+    // --- Chain identity (never changes) ---
+    /// How long each link in the chain is (short, medium, etc.) so humans know
+    /// what sort of identifier to expect.
     resolution: ProvenanceMarkResolution,
+    /// Public anchor that identifies this chain; stays the same no matter which
+    /// quorum advances it.
     chain_id: Vec<u8>,
-    current_key: Vec<u8>,
-    ratchet_state: [u8; 32],
-    sequence: u32,
-    last_date: Date,
+    /// The group’s shared public key point on the curve; needed for VRF checks.
     group_point: ProjectivePoint,
+
+    // --- Rolling state (updates every time a new mark is published) ---
+    /// The key revealed in the most recently published mark.
+    last_key: Vec<u8>,
+    /// Public “memory” derived from prior marks so anyone can build the next
+    /// VRF message deterministically.
+    ratchet_state: [u8; 32],
+    /// How many marks have been published so far (starting at zero for genesis).
+    sequence: u32,
+    /// Timestamp attached to the most recent mark, used to ensure time never
+    /// moves backwards.
+    last_date: Date,
 }
 
 impl FrostProvenanceChain {
@@ -60,11 +74,11 @@ impl FrostProvenanceChain {
         Ok(Self {
             resolution,
             chain_id: chain_id.clone(),
-            current_key: chain_id,
+            group_point,
+            last_key: chain_id,
             ratchet_state: state,
             sequence: 0,
             last_date: genesis_date,
-            group_point,
         })
     }
 
@@ -93,7 +107,7 @@ impl FrostProvenanceChain {
         if mark.seq() != self.sequence {
             return Err(Error::msg("advance sequence mismatch"));
         }
-        if mark.key() != self.current_key {
+        if mark.key() != self.last_key {
             return Err(Error::msg("advance key mismatch"));
         }
         if mark.date() < &self.last_date {
@@ -117,7 +131,7 @@ impl FrostProvenanceChain {
 
         let rebuilt = ProvenanceMark::new(
             self.resolution,
-            self.current_key.clone(),
+            self.last_key.clone(),
             next_key_vec.clone(),
             self.chain_id.clone(),
             self.sequence,
@@ -130,7 +144,7 @@ impl FrostProvenanceChain {
 
         let expanded_key = expand_mark_key(&next_key_vec);
         self.ratchet_state = ratchet_state(&self.ratchet_state, &expanded_key);
-        self.current_key = next_key_vec;
+        self.last_key = next_key_vec;
         self.sequence += 1;
         self.last_date = mark.date().clone();
         Ok(())

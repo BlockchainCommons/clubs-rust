@@ -224,9 +224,7 @@ impl TryFrom<Envelope> for Edition {
                     // Decode permit: extract sealed message and optional holder
                     // XID.
                     if !obj.is_obscured() {
-                        let sealed = obj
-                            .extract_subject::<SealedMessage>(
-                            )?;
+                        let sealed = obj.extract_subject::<SealedMessage>()?;
                         // Find optional holder assertion(s) on the permit
                         // assertion envelope.
                         let holder_xid: Option<XID> = match assertion
