@@ -1,4 +1,4 @@
-use bc_components::{ARID, XID};
+use bc_components::ARID;
 use k256::{ProjectivePoint, Scalar};
 use rand_core::OsRng;
 
@@ -6,22 +6,14 @@ use crate::frost::{
     group::FrostGroup,
     participant::FrostParticipant,
     pm::{
+        commitment::FrostPmCommitment,
         gamma_share::FrostPmGammaShare,
-        primitives::{point_bytes, point_from_bytes},
+        primitives::point_bytes,
         response_share::{FrostPmResponseShare, response_share_scalar_from_bytes},
         signing_package::FrostPmSigningPackage,
     },
 };
 use crate::{Error, Result};
-
-/// Round-1 commitment for a provenance-mark VRF ceremony.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FrostPmCommitment {
-    pub xid: XID,
-    pub session: ARID,
-    pub g_commitment: [u8; 33],
-    pub h_commitment: [u8; 33],
-}
 
 impl FrostParticipant {
     /// Round-1: generate per-signer commitments A=k·G and B=k·H for the provided hash point H.
@@ -106,15 +98,5 @@ impl FrostParticipant {
         self.pm_nonce = None;
         self.pm_lambda_share = None;
         Ok(FrostPmResponseShare::from_scalar(self.xid(), session, &z_share))
-    }
-}
-
-impl FrostPmCommitment {
-    pub fn g_point(&self) -> Result<ProjectivePoint> {
-        point_from_bytes(&self.g_commitment).map_err(Into::into)
-    }
-
-    pub fn h_point(&self) -> Result<ProjectivePoint> {
-        point_from_bytes(&self.h_commitment).map_err(Into::into)
     }
 }

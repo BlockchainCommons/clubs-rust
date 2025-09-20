@@ -6,9 +6,12 @@ use k256::{ProjectivePoint, Scalar};
 use crate::frost::{
     group::FrostGroup,
     pm::{
-        DleqProof, FrostPmCommitment, FrostPmGammaShare, FrostPmResponseShare,
-        FrostPmSigningPackage,
+        commitment::FrostPmCommitment,
+        gamma_share::FrostPmGammaShare,
         primitives::{dleq_challenge, point_bytes},
+        response_share::FrostPmResponseShare,
+        signing_package::FrostPmSigningPackage,
+        DleqProof,
     },
 };
 use crate::{Error, Result};

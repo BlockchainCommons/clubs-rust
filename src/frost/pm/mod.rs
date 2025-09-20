@@ -1,4 +1,5 @@
 mod coordinator;
+pub mod commitment;
 mod participant;
 pub mod primitives;
 pub mod state;
@@ -7,7 +8,7 @@ pub mod gamma_share;
 pub mod response_share;
 
 pub use coordinator::FrostPmCoordinator;
-pub use participant::FrostPmCommitment;
+pub use commitment::FrostPmCommitment;
 pub use gamma_share::FrostPmGammaShare;
 pub use response_share::FrostPmResponseShare;
 pub use signing_package::FrostPmSigningPackage;
