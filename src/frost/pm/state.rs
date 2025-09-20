@@ -6,14 +6,12 @@ use k256::ProjectivePoint;
 use provenance_mark::{ProvenanceMark, ProvenanceMarkResolution};
 use sha2::{Digest, Sha256};
 
-use crate::frost::pm::primitives::DleqProof;
+use crate::frost::pm::primitives::{
+    DleqProof, expand_mark_key, hash_to_curve, key_from_gamma, pm_message,
+    point_bytes, point_from_bytes, ratchet_state, vrf_verify_for_x,
+};
 use crate::frost::{
-    group::FrostGroup,
-    participant::FrostParticipant,
-    pm::{
-        FrostPmCoordinator, expand_mark_key, hash_to_curve, key_from_gamma,
-        pm_message, point_bytes, ratchet_state,
-    },
+    group::FrostGroup, participant::FrostParticipant, pm::FrostPmCoordinator,
 };
 use crate::{Error, Result};
 
@@ -173,5 +171,63 @@ impl FrostProvenanceChain {
         self.last_date = date;
 
         Ok(FrostProvenanceAdvance { mark, gamma_bytes, proof })
+    }
+
+    pub fn verify_advance(
+        &mut self,
+        advance: &FrostProvenanceAdvance,
+    ) -> Result<()> {
+        if advance.mark.chain_id() != self.chain_id {
+            return Err(Error::msg("advance chain id mismatch"));
+        }
+        if advance.mark.seq() != self.sequence {
+            return Err(Error::msg("advance sequence mismatch"));
+        }
+        if advance.mark.key() != self.current_key {
+            return Err(Error::msg("advance key mismatch"));
+        }
+        if advance.mark.date() < &self.last_date {
+            return Err(Error::msg("advance date regresses"));
+        }
+
+        let next_step = (self.sequence as u64) + 1;
+        let message = pm_message(
+            &self.group_point,
+            &self.chain_id,
+            &self.ratchet_state,
+            next_step,
+        )?;
+        let h_point = hash_to_curve(&message)?;
+        let gamma_point = point_from_bytes(&advance.gamma_bytes)?;
+        vrf_verify_for_x(
+            &self.group_point,
+            &h_point,
+            &gamma_point,
+            &advance.proof,
+        )?;
+
+        let full_key = key_from_gamma(&gamma_point)?;
+        let link_len = self.resolution.link_length();
+        let next_key_vec = full_key[..link_len].to_vec();
+
+        let rebuilt = ProvenanceMark::new(
+            self.resolution,
+            self.current_key.clone(),
+            next_key_vec.clone(),
+            self.chain_id.clone(),
+            self.sequence,
+            advance.mark.date().clone(),
+            advance.mark.info(),
+        )?;
+        if rebuilt != advance.mark {
+            return Err(Error::msg("advance mark does not match VRF output"));
+        }
+
+        let expanded_key = expand_mark_key(&next_key_vec);
+        self.ratchet_state = ratchet_state(&self.ratchet_state, &expanded_key);
+        self.current_key = next_key_vec;
+        self.sequence += 1;
+        self.last_date = advance.mark.date().clone();
+        Ok(())
     }
 }

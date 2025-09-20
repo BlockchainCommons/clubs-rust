@@ -176,7 +176,7 @@ impl FrostPmCoordinator {
             .roster
             .as_ref()
             .ok_or_else(|| Error::msg("signing package not yet prepared"))?;
-        let lambda_factors = self
+        let _lambda_factors = self
             .lambda_factors
             .as_ref()
             .ok_or_else(|| Error::msg("lambda factors missing"))?;
@@ -187,17 +187,13 @@ impl FrostPmCoordinator {
         let mut aggregated_a = ProjectivePoint::IDENTITY;
         let mut aggregated_b = ProjectivePoint::IDENTITY;
         for xid in roster {
-            let lambda = lambda_factors
-                .get(xid)
-                .copied()
-                .ok_or_else(|| Error::msg("missing lambda for participant"))?;
             let commitment = self.commitments.get(xid).ok_or_else(|| {
                 Error::msg("missing commitment for participant")
             })?;
             let a_i = commitment.g_point()?;
             let b_i = commitment.h_point()?;
-            aggregated_a += a_i * lambda;
-            aggregated_b += b_i * lambda;
+            aggregated_a += a_i;
+            aggregated_b += b_i;
         }
 
         let mut aggregated_gamma = ProjectivePoint::IDENTITY;

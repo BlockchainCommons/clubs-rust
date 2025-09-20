@@ -16,6 +16,7 @@ use super::{
     },
 };
 
+#[derive(Clone)]
 pub struct FrostParticipant {
     xid: XID,
     key_package: frost::keys::KeyPackage,
