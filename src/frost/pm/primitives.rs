@@ -183,6 +183,16 @@ pub fn vrf_verify_for_x(
     Ok(())
 }
 
+/// Expose the DLEQ challenge computation for coordinators aggregating proofs.
+pub fn dleq_challenge(
+    x_point: &ProjectivePoint,
+    gamma: &ProjectivePoint,
+    a: &ProjectivePoint,
+    b: &ProjectivePoint,
+) -> Result<Scalar> {
+    dleq_challenge_x(x_point, gamma, a, b)
+}
+
 /// Build the provenance mark VRF message for a given step index.
 pub fn pm_message(
     x_point: &ProjectivePoint,

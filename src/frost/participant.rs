@@ -6,6 +6,7 @@ use frost_secp256k1_tr::{
     self as frost, Identifier,
     round1::{NonceCommitment, SigningCommitments},
 };
+use k256::Scalar;
 use rand::rngs::OsRng;
 
 use super::{
@@ -19,15 +20,29 @@ pub struct FrostParticipant {
     xid: XID,
     key_package: frost::keys::KeyPackage,
     nonces: Option<frost::round1::SigningNonces>,
+    pub(super) pm_session: Option<ARID>,
+    pub(super) pm_nonce: Option<Scalar>,
+    pub(super) pm_lambda_share: Option<Scalar>,
 }
 
 impl FrostParticipant {
     pub fn new(xid: XID, key_package: frost::keys::KeyPackage) -> Self {
-        Self { xid, key_package, nonces: None }
+        Self {
+            xid,
+            key_package,
+            nonces: None,
+            pm_session: None,
+            pm_nonce: None,
+            pm_lambda_share: None,
+        }
     }
 
     pub fn xid(&self) -> XID {
         self.xid
+    }
+
+    pub(super) fn key_package(&self) -> &frost::keys::KeyPackage {
+        &self.key_package
     }
 
     /// Perform Round-1 locally: generate nonces and commitments. Stores nonces

@@ -4,6 +4,8 @@ use crate::{Error, Result};
 use bc_components::{SigningPublicKey, XID};
 use dcbor::prelude::*;
 use frost_secp256k1_tr::{self as frost, Identifier};
+use k256::elliptic_curve::PrimeField;
+use k256::{FieldBytes, Scalar};
 use rand::rngs::OsRng; // ByteString
 
 use crate::frost::participant::FrostParticipant;
@@ -99,6 +101,20 @@ pub struct FrostGroup {
 }
 
 impl FrostGroup {
+    fn identifier_scalar(id: &Identifier) -> Result<Scalar> {
+        let bytes = id.serialize();
+        if bytes.len() != 32 {
+            return Err(Error::msg("identifier serialization length mismatch"));
+        }
+        let array: [u8; 32] = bytes
+            .as_slice()
+            .try_into()
+            .map_err(|_| Error::msg("identifier serialization invalid"))?;
+        let field_bytes = FieldBytes::from(array);
+        Option::<Scalar>::from(Scalar::from_repr(field_bytes))
+            .ok_or_else(|| Error::msg("identifier scalar out of field range"))
+    }
+
     pub(super) fn new(
         threshold: usize,
         members: Vec<XID>,
@@ -157,6 +173,55 @@ impl FrostGroup {
         &self,
     ) -> Result<frost_secp256k1_tr::keys::PublicKeyPackage> {
         self.pubkey_package.to_frost()
+    }
+
+    pub(super) fn lagrange_coefficients(
+        &self,
+        roster: &[XID],
+    ) -> Result<BTreeMap<XID, Scalar>> {
+        if roster.len() < self.threshold {
+            return Err(Error::msg("roster smaller than threshold"));
+        }
+
+        let mut scalars: BTreeMap<XID, Scalar> = BTreeMap::new();
+        for xid in roster {
+            if scalars.contains_key(xid) {
+                return Err(Error::msg("duplicate xid in roster"));
+            }
+            let identifier = self.id_for_xid(xid)?;
+            let scalar = Self::identifier_scalar(&identifier)?;
+            scalars.insert(*xid, scalar);
+        }
+
+        let mut coeffs: BTreeMap<XID, Scalar> = BTreeMap::new();
+        for xid in roster {
+            let x_i = scalars
+                .get(xid)
+                .copied()
+                .ok_or_else(|| Error::msg("missing scalar for xid"))?;
+            let mut num = Scalar::ONE;
+            let mut den = Scalar::ONE;
+            for (other_xid, x_j) in &scalars {
+                if other_xid == xid {
+                    continue;
+                }
+                num *= *x_j;
+                let diff = *x_j - x_i;
+                if diff == Scalar::ZERO {
+                    return Err(Error::msg(
+                        "duplicate identifier scalar encountered",
+                    ));
+                }
+                den *= diff;
+            }
+            let den_inv =
+                Option::<Scalar>::from(den.invert()).ok_or_else(|| {
+                    Error::msg("non-invertible denominator in lagrange")
+                })?;
+            coeffs.insert(*xid, num * den_inv);
+        }
+
+        Ok(coeffs)
     }
 
     /// Create a FROST group with a trusted dealer and return signer contexts.
