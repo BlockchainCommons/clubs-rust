@@ -15,7 +15,8 @@ pub use primitives::{
     DleqProof, FrostPmError, Result as FrostPmResult, dleq_challenge,
     expand_mark_key, hash_to_curve, key_from_gamma, normalize_secret_to_pubkey,
     pm_message, point_bytes, point_from_bytes, ratchet_state,
-    vrf_gamma_and_proof_for_x, vrf_verify_for_x,
+    scalar_from_be_bytes, scalar_to_be_bytes, vrf_gamma_and_proof_for_x,
+    vrf_verify_for_x,
 };
 pub use response_share::FrostPmResponseShare;
 pub use signing_package::FrostPmSigningPackage;

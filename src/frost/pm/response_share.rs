@@ -1,18 +1,10 @@
 use bc_components::{ARID, XID};
-use k256::{FieldBytes, Scalar, elliptic_curve::PrimeField};
+use k256::Scalar;
 
-use crate::{Error, Result};
-
-fn scalar_from_be_bytes(bytes: &[u8]) -> Result<Scalar> {
-    let array: [u8; 32] = bytes
-        .try_into()
-        .map_err(|_| Error::msg("invalid scalar length"))?;
-    let field_bytes = FieldBytes::from(array);
-    Option::<Scalar>::from(Scalar::from_repr(field_bytes))
-        .ok_or_else(|| Error::msg("scalar out of range"))
-}
-
-fn scalar_to_be_bytes(scalar: &Scalar) -> [u8; 32] { scalar.to_bytes().into() }
+use crate::{
+    Result,
+    frost::pm::{scalar_from_be_bytes, scalar_to_be_bytes},
+};
 
 /// Participant response share for the DLEQ proof (partial `z`).
 #[derive(Clone, Debug, PartialEq, Eq)]

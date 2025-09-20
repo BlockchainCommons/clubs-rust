@@ -5,15 +5,17 @@ use core::ops::Add;
 use frost_secp256k1_tr as frost;
 use frost_secp256k1_tr::Group;
 use k256::{
-    AffinePoint, EncodedPoint, ProjectivePoint, Scalar, Secp256k1,
+    AffinePoint, EncodedPoint, FieldBytes, ProjectivePoint, Scalar, Secp256k1,
     elliptic_curve::{
+        PrimeField,
         hash2curve::{ExpandMsgXmd, GroupDigest},
         sec1::{FromEncodedPoint, ToEncodedPoint},
     },
 };
 use rand_core::OsRng;
 use sha2::{Digest, Sha256};
-use thiserror::Error;
+
+use crate::Error;
 
 /// Domain separator for the hash-to-curve operation.
 pub const H2C_DST: &[u8] = b"FROST-VRF-secp256k1-SHA256-RO";
@@ -29,7 +31,7 @@ pub const PM_MESSAGE_PREFIX: &[u8] = b"PMVRF-secp256k1-v1";
 pub const PM_KEY32_DST: &[u8] = b"PM-KEY32";
 
 /// Errors encountered while operating on the VRF / DLEQ primitives.
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum FrostPmError {
     #[error("malformed SEC1 encoding")]
     PointEncoding,
@@ -270,4 +272,17 @@ pub fn expand_mark_key(key_trunc: &[u8]) -> [u8; 32] {
     let mut out = [0u8; 32];
     out.copy_from_slice(&digest);
     out
+}
+
+pub fn scalar_from_be_bytes(bytes: &[u8]) -> crate::Result<Scalar> {
+    let array: [u8; 32] = bytes
+        .try_into()
+        .map_err(|_| Error::msg("invalid scalar length"))?;
+    let field_bytes = FieldBytes::from(array);
+    Option::<Scalar>::from(Scalar::from_repr(field_bytes))
+        .ok_or_else(|| Error::msg("scalar out of range"))
+}
+
+pub fn scalar_to_be_bytes(scalar: &Scalar) -> [u8; 32] {
+    scalar.to_bytes().into()
 }
