@@ -16,7 +16,10 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     // --- Prepare an Envelope, wrapped so the signature covers the whole
     // structure ---
     let message = Envelope::new("FROST demo")
-        .add_assertion(known_values::NOTE, "This is an assertion on the subject.")
+        .add_assertion(
+            known_values::NOTE,
+            "This is an assertion on the subject.",
+        )
         .wrap();
     // --- Build FrostGroup of all participants using Trusted Dealer ---
     let members = vec![alice_doc.xid(), bob_doc.xid(), charlie_doc.xid()];

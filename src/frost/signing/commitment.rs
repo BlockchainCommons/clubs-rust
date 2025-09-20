@@ -1,7 +1,7 @@
+use crate::{Error, Result};
 use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
 use known_values::HOLDER;
-use crate::{Error, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrostSigningCommitment {
@@ -21,10 +21,16 @@ impl FrostSigningCommitment {
         let h = hiding.as_ref();
         let b = binding.as_ref();
         if h.len() != 33 {
-            return Err(Error::msg(format!("invalid hiding length: {}", h.len())));
+            return Err(Error::msg(format!(
+                "invalid hiding length: {}",
+                h.len()
+            )));
         }
         if b.len() != 33 {
-            return Err(Error::msg(format!("invalid binding length: {}", b.len())));
+            return Err(Error::msg(format!(
+                "invalid binding length: {}",
+                b.len()
+            )));
         }
         Ok(Self {
             xid,
@@ -54,7 +60,9 @@ impl TryFrom<Envelope> for FrostSigningCommitment {
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
-            return Err(Error::msg("unexpected subject for FrostSigningCommitment"));
+            return Err(Error::msg(
+                "unexpected subject for FrostSigningCommitment",
+            ));
         }
         let xid: XID = envelope.try_object_for_predicate(HOLDER)?;
         let session: ARID = envelope.try_object_for_predicate("session")?;

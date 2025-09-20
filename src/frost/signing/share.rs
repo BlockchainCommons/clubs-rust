@@ -1,6 +1,6 @@
+use crate::{Error, Result};
 use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
-use crate::{Error, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrostSignatureShare {
@@ -27,9 +27,12 @@ impl TryFrom<Envelope> for FrostSignatureShare {
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
-            return Err(Error::msg("unexpected subject for FrostSignatureShare"));
+            return Err(Error::msg(
+                "unexpected subject for FrostSignatureShare",
+            ));
         }
-        let xid: XID = envelope.try_object_for_predicate(known_values::HOLDER)?;
+        let xid: XID =
+            envelope.try_object_for_predicate(known_values::HOLDER)?;
         let session: ARID = envelope.try_object_for_predicate("session")?;
         let share_bs: ByteString =
             envelope.try_object_for_predicate("share")?;

@@ -42,9 +42,9 @@ impl FrostPublicKeyPackage {
             BTreeMap::new();
         for (id, vs) in pkg.verifying_shares().iter() {
             let id_bytes = ByteString::from(id.serialize());
-            let vs_bytes = vs
-                .serialize()
-                .map_err(|e| Error::msg(format!("serialize verifying share: {e}")))?;
+            let vs_bytes = vs.serialize().map_err(|e| {
+                Error::msg(format!("serialize verifying share: {e}"))
+            })?;
             if vs_bytes.len() != 33 {
                 return Err(Error::msg("invalid verifying share size"));
             }
@@ -60,7 +60,9 @@ impl FrostPublicKeyPackage {
 
         let verifying_key =
             VerifyingKey::deserialize(self.verifying_key_sec1.as_ref())
-                .map_err(|e| Error::msg(format!("deserialize verifying key: {e}")))?;
+                .map_err(|e| {
+                    Error::msg(format!("deserialize verifying key: {e}"))
+                })?;
 
         let mut vshares: BTreeMap<
             frost_secp256k1_tr::Identifier,
@@ -69,9 +71,13 @@ impl FrostPublicKeyPackage {
         for (id_bytes, sec1) in &self.verifying_shares_sec1 {
             let id =
                 frost_secp256k1_tr::Identifier::deserialize(id_bytes.as_ref())
-                    .map_err(|e| Error::msg(format!("deserialize identifier: {e}")))?;
-            let vs = VerifyingShare::deserialize(sec1.as_ref())
-                .map_err(|e| Error::msg(format!("deserialize verifying share: {e}")))?;
+                    .map_err(|e| {
+                        Error::msg(format!("deserialize identifier: {e}"))
+                    })?;
+            let vs =
+                VerifyingShare::deserialize(sec1.as_ref()).map_err(|e| {
+                    Error::msg(format!("deserialize verifying share: {e}"))
+                })?;
             vshares.insert(id, vs);
         }
 
@@ -136,17 +142,15 @@ impl FrostGroup {
         &self,
         xid: &XID,
     ) -> Result<SigningPublicKey> {
-        self.participant_keys
-            .get(xid)
-            .cloned()
-            .ok_or_else(|| Error::msg(format!("unknown member XID in group: {}", xid)))
+        self.participant_keys.get(xid).cloned().ok_or_else(|| {
+            Error::msg(format!("unknown member XID in group: {}", xid))
+        })
     }
 
     pub(super) fn id_for_xid(&self, xid: &XID) -> Result<Identifier> {
-        self.id_map
-            .get(xid)
-            .cloned()
-            .ok_or_else(|| Error::msg(format!("unknown member XID in group: {}", xid)))
+        self.id_map.get(xid).cloned().ok_or_else(|| {
+            Error::msg(format!("unknown member XID in group: {}", xid))
+        })
     }
 
     pub(super) fn to_frost_public_key_package(

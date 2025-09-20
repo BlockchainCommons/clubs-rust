@@ -63,7 +63,10 @@ impl FrostCoordinator {
     pub fn add_commitment(&mut self, c: FrostSigningCommitment) -> Result<()> {
         // Ensure the commitment belongs to a group member
         if !self.group.members.contains(&c.xid) {
-            return Err(Error::msg(format!("commitment from non-member: {}", c.xid)));
+            return Err(Error::msg(format!(
+                "commitment from non-member: {}",
+                c.xid
+            )));
         }
         if c.session != self.session_id {
             return Err(Error::msg(format!(
@@ -160,7 +163,10 @@ impl FrostCoordinator {
     pub fn add_share(&mut self, s: FrostSignatureShare) -> Result<()> {
         // Validate member
         if !self.group.members.contains(&s.xid) {
-            return Err(Error::msg(format!("share from non-member: {}", s.xid)));
+            return Err(Error::msg(format!(
+                "share from non-member: {}",
+                s.xid
+            )));
         }
         if s.session != self.session_id {
             return Err(Error::msg(format!(
@@ -208,7 +214,10 @@ impl FrostCoordinator {
     /// Record explicit consent from a member after viewing the message.
     pub fn record_consent(&mut self, xid: XID) -> Result<()> {
         if !self.group.members.contains(&xid) {
-            return Err(Error::msg(format!("consent from non-member: {}", xid)));
+            return Err(Error::msg(format!(
+                "consent from non-member: {}",
+                xid
+            )));
         }
         self.consent.insert(xid);
         Ok(())

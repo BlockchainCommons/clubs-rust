@@ -2,6 +2,7 @@ mod aggregate;
 mod coordinator;
 mod group;
 mod participant;
+pub mod pm;
 mod signing;
 
 pub use aggregate::{

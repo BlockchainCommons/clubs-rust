@@ -31,7 +31,9 @@ pub fn attach_preaggregated_signature(
         envelope.add_assertion(known_values::SIGNED, signature.clone());
     signed
         .verify_signature_from(&group.verifying_signing_key())
-        .map_err(|e| Error::msg(format!("envelope signature verification failed: {e}")))?;
+        .map_err(|e| {
+            Error::msg(format!("envelope signature verification failed: {e}"))
+        })?;
 
     Ok(signed)
 }
@@ -44,7 +46,9 @@ pub fn aggregate_and_attach_signature(
 ) -> Result<Envelope> {
     // Validate session consistency
     if signing_package_g.session != shares_g.session {
-        return Err(Error::msg("signing package and shares belong to different sessions"));
+        return Err(Error::msg(
+            "signing package and shares belong to different sessions",
+        ));
     }
     // Convert group public key package
     let frost_pkg = group.to_frost_public_key_package()?;
@@ -55,10 +59,14 @@ pub fn aggregate_and_attach_signature(
     > = BTreeMap::new();
     for c in &signing_package_g.commitments {
         let id = group.id_for_xid(&c.xid)?;
-        let hiding = NonceCommitment::deserialize(c.hiding.as_ref())
-            .map_err(|e| Error::msg(format!("deserialize hiding commitment: {e}")))?;
+        let hiding =
+            NonceCommitment::deserialize(c.hiding.as_ref()).map_err(|e| {
+                Error::msg(format!("deserialize hiding commitment: {e}"))
+            })?;
         let binding = NonceCommitment::deserialize(c.binding.as_ref())
-            .map_err(|e| Error::msg(format!("deserialize binding commitment: {e}")))?;
+            .map_err(|e| {
+                Error::msg(format!("deserialize binding commitment: {e}"))
+            })?;
         let comm = SigningCommitments::new(hiding, binding);
         frost_commitments.insert(id, comm);
     }
@@ -90,14 +98,19 @@ pub fn aggregate_and_attach_signature(
         &frost_shares,
         &frost_pkg,
     )
-    .map_err(|e| Error::msg(format!("aggregate group signature failed: {e}")))?;
+    .map_err(|e| {
+        Error::msg(format!("aggregate group signature failed: {e}"))
+    })?;
 
     // Convert aggregated signature to BIP-340 bytes
-    let sig_vec = group_sig
-        .serialize()
-        .map_err(|e| Error::msg(format!("serialize group signature failed: {e}")))?;
+    let sig_vec = group_sig.serialize().map_err(|e| {
+        Error::msg(format!("serialize group signature failed: {e}"))
+    })?;
     if sig_vec.len() != 64 {
-        return Err(Error::msg(format!("unexpected Schnorr signature length: {}", sig_vec.len())));
+        return Err(Error::msg(format!(
+            "unexpected Schnorr signature length: {}",
+            sig_vec.len()
+        )));
     }
     let mut sig_bytes = [0u8; 64];
     sig_bytes.copy_from_slice(&sig_vec);

@@ -37,10 +37,7 @@ impl PublicKeyPermit {
     }
 
     /// Build a permit for a recipient with optional member XID annotation.
-    pub fn for_member(
-        member_xid: XID,
-        public_keys: &PublicKeys,
-    ) -> Self {
+    pub fn for_member(member_xid: XID, public_keys: &PublicKeys) -> Self {
         Self::new(public_keys.clone()).with_member_xid(member_xid)
     }
 

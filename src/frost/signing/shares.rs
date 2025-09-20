@@ -1,7 +1,7 @@
+use super::share::FrostSignatureShare;
+use crate::{Error, Result};
 use bc_components::ARID;
 use bc_envelope::prelude::*;
-use crate::{Error, Result};
-use super::share::FrostSignatureShare;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrostSignatureShares {
@@ -36,7 +36,9 @@ impl TryFrom<Envelope> for FrostSignatureShares {
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
-            return Err(Error::msg("unexpected subject for FrostSignatureShares"));
+            return Err(Error::msg(
+                "unexpected subject for FrostSignatureShares",
+            ));
         }
         let session: ARID = envelope.try_object_for_predicate("session")?;
         let mut shares: Vec<FrostSignatureShare> = Vec::new();
@@ -49,7 +51,9 @@ impl TryFrom<Envelope> for FrostSignatureShares {
                         let obj_env = assertion.try_object()?;
                         let s = FrostSignatureShare::try_from(obj_env)?;
                         if s.session != session {
-                            return Err(Error::msg("share session mismatch in container"));
+                            return Err(Error::msg(
+                                "share session mismatch in container",
+                            ));
                         }
                         shares.push(s);
                     }

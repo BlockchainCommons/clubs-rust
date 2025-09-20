@@ -4,10 +4,7 @@ use bc_components::{
 };
 use bc_envelope::prelude::*;
 use bc_xid::XIDDocument;
-use clubs::{
-    edition::Edition,
-    public_key_permit::PublicKeyPermit,
-};
+use clubs::{edition::Edition, public_key_permit::PublicKeyPermit};
 use indoc::indoc;
 use known_values::{CONTENT, NAME};
 use provenance_mark::{ProvenanceMarkGenerator, ProvenanceMarkResolution};

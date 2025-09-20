@@ -1,7 +1,7 @@
+use super::commitment::FrostSigningCommitment;
+use crate::{Error, Result};
 use bc_components::ARID;
 use bc_envelope::prelude::*;
-use crate::{Error, Result};
-use super::commitment::FrostSigningCommitment;
 
 #[derive(Clone, Debug)]
 pub struct FrostSigningPackage {
@@ -44,7 +44,9 @@ impl TryFrom<Envelope> for FrostSigningPackage {
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
-            return Err(Error::msg("unexpected subject for FrostSigningPackage"));
+            return Err(Error::msg(
+                "unexpected subject for FrostSigningPackage",
+            ));
         }
         let session: ARID = envelope.try_object_for_predicate("session")?;
         let message = envelope.object_for_predicate("message")?;

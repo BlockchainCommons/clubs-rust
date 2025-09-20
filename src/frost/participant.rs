@@ -39,14 +39,12 @@ impl FrostParticipant {
         let (nonces, comms) =
             frost::round1::commit(self.key_package.signing_share(), &mut OsRng);
         self.nonces = Some(nonces);
-        let hid = comms
-            .hiding()
-            .serialize()
-            .map_err(|e| Error::msg(format!("serialize hiding commitment: {e}")))?;
-        let bind = comms
-            .binding()
-            .serialize()
-            .map_err(|e| Error::msg(format!("serialize binding commitment: {e}")))?;
+        let hid = comms.hiding().serialize().map_err(|e| {
+            Error::msg(format!("serialize hiding commitment: {e}"))
+        })?;
+        let bind = comms.binding().serialize().map_err(|e| {
+            Error::msg(format!("serialize binding commitment: {e}"))
+        })?;
         FrostSigningCommitment::new(self.xid, session, &hid, &bind)
     }
 
@@ -71,7 +69,9 @@ impl FrostParticipant {
             let hiding = NonceCommitment::deserialize(comm.hiding.as_ref())
                 .map_err(|e| Error::msg(format!("deserialize hiding: {e}")))?;
             let binding = NonceCommitment::deserialize(comm.binding.as_ref())
-                .map_err(|e| Error::msg(format!("deserialize binding: {e}")))?;
+                .map_err(|e| {
+                Error::msg(format!("deserialize binding: {e}"))
+            })?;
             frost_commitments
                 .insert(id, SigningCommitments::new(hiding, binding));
         }
@@ -83,7 +83,7 @@ impl FrostParticipant {
 
         let share = frost::round2::sign(&frost_sp, nonces, &self.key_package)
             .map_err(|e| {
-                Error::msg(format!("round2 sign failed for {}: {e}", self.xid))
+            Error::msg(format!("round2 sign failed for {}: {e}", self.xid))
         })?;
         Ok(FrostSignatureShare {
             xid: self.xid,

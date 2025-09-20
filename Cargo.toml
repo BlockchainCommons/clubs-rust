@@ -12,6 +12,9 @@ bc-xid = "^0.13.0"
 bc-components = "^0.25.0"
 known-values = "^0.8.0"
 rand = "^0.8.5"
+k256 = { version = "^0.13.4", features = ["arithmetic", "hash2curve"] }
+sha2 = "^0.10.9"
+rand_core = "^0.6.4"
 
 frost-secp256k1-tr = "2.2.0"
 hex = "^0.4.3"

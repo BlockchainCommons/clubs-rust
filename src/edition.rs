@@ -246,7 +246,7 @@ impl TryFrom<Envelope> for Edition {
                 }
                 _ => {
                     return Err(Error::msg(
-                        "Unexpected predicate in Edition envelope"
+                        "Unexpected predicate in Edition envelope",
                     ));
                 }
             }
