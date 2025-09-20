@@ -4,12 +4,11 @@ use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
 
 use super::{
-    aggregate::aggregate_and_attach_signature,
-    group::FrostGroup,
-    signing::{
-        FrostSignatureShare, FrostSignatureShares, FrostSigningCommitment,
-        FrostSigningPackage, build_signing_package,
-    },
+    super::{aggregate::aggregate_and_attach_signature, group::FrostGroup},
+    commitment::FrostSigningCommitment,
+    package::{FrostSigningPackage, build_signing_package},
+    share::FrostSignatureShare,
+    shares::FrostSignatureShares,
 };
 use crate::{Error, Result};
 
