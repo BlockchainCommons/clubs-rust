@@ -1,6 +1,6 @@
 use bc_components::ARID;
 use bc_envelope::prelude::*;
-
+use crate::{Error, Result};
 use super::share::FrostSignatureShare;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -30,13 +30,13 @@ impl From<FrostSignatureShares> for Envelope {
 }
 
 impl TryFrom<Envelope> for FrostSignatureShares {
-    type Error = anyhow::Error;
-    fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
+    type Error = Error;
+    fn try_from(envelope: Envelope) -> Result<Self> {
         envelope.check_type_envelope("FrostSignatureShares")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
-            anyhow::bail!("unexpected subject for FrostSignatureShares");
+            return Err(Error::msg("unexpected subject for FrostSignatureShares"));
         }
         let session: ARID = envelope.try_object_for_predicate("session")?;
         let mut shares: Vec<FrostSignatureShare> = Vec::new();
@@ -49,9 +49,7 @@ impl TryFrom<Envelope> for FrostSignatureShares {
                         let obj_env = assertion.try_object()?;
                         let s = FrostSignatureShare::try_from(obj_env)?;
                         if s.session != session {
-                            anyhow::bail!(
-                                "share session mismatch in container"
-                            );
+                            return Err(Error::msg("share session mismatch in container"));
                         }
                         shares.push(s);
                     }

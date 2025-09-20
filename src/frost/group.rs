@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::{Result, anyhow, bail};
+use crate::{Error, Result};
 use bc_components::{SigningPublicKey, XID};
 use dcbor::prelude::*;
 use frost_secp256k1_tr::{self as frost, Identifier};
@@ -32,9 +32,9 @@ impl FrostPublicKeyPackage {
         let vkey = pkg
             .verifying_key()
             .serialize()
-            .map_err(|e| anyhow!("serialize verifying key: {e}"))?;
+            .map_err(|e| Error::msg(format!("serialize verifying key: {e}")))?;
         if vkey.len() != 33 {
-            bail!("invalid verifying key length");
+            return Err(Error::msg("invalid verifying key length"));
         }
         let verifying_key_sec1: ByteString = vkey.into();
 
@@ -44,9 +44,9 @@ impl FrostPublicKeyPackage {
             let id_bytes = ByteString::from(id.serialize());
             let vs_bytes = vs
                 .serialize()
-                .map_err(|e| anyhow!("serialize verifying share: {e}"))?;
+                .map_err(|e| Error::msg(format!("serialize verifying share: {e}")))?;
             if vs_bytes.len() != 33 {
-                bail!("invalid verifying share size");
+                return Err(Error::msg("invalid verifying share size"));
             }
             verifying_shares_sec1.insert(id_bytes, vs_bytes.into());
         }
@@ -56,12 +56,11 @@ impl FrostPublicKeyPackage {
     pub(super) fn to_frost(
         &self,
     ) -> Result<frost_secp256k1_tr::keys::PublicKeyPackage> {
-        use anyhow::anyhow;
         use frost_secp256k1_tr::{VerifyingKey, keys::VerifyingShare};
 
         let verifying_key =
             VerifyingKey::deserialize(self.verifying_key_sec1.as_ref())
-                .map_err(|e| anyhow!("deserialize verifying key: {e}"))?;
+                .map_err(|e| Error::msg(format!("deserialize verifying key: {e}")))?;
 
         let mut vshares: BTreeMap<
             frost_secp256k1_tr::Identifier,
@@ -70,9 +69,9 @@ impl FrostPublicKeyPackage {
         for (id_bytes, sec1) in &self.verifying_shares_sec1 {
             let id =
                 frost_secp256k1_tr::Identifier::deserialize(id_bytes.as_ref())
-                    .map_err(|e| anyhow!("deserialize identifier: {e}"))?;
+                    .map_err(|e| Error::msg(format!("deserialize identifier: {e}")))?;
             let vs = VerifyingShare::deserialize(sec1.as_ref())
-                .map_err(|e| anyhow!("deserialize verifying share: {e}"))?;
+                .map_err(|e| Error::msg(format!("deserialize verifying share: {e}")))?;
             vshares.insert(id, vs);
         }
 
@@ -140,14 +139,14 @@ impl FrostGroup {
         self.participant_keys
             .get(xid)
             .cloned()
-            .ok_or_else(|| anyhow!("unknown member XID in group: {}", xid))
+            .ok_or_else(|| Error::msg(format!("unknown member XID in group: {}", xid)))
     }
 
     pub(super) fn id_for_xid(&self, xid: &XID) -> Result<Identifier> {
         self.id_map
             .get(xid)
             .cloned()
-            .ok_or_else(|| anyhow!("unknown member XID in group: {}", xid))
+            .ok_or_else(|| Error::msg(format!("unknown member XID in group: {}", xid)))
     }
 
     pub(super) fn to_frost_public_key_package(
@@ -194,7 +193,7 @@ impl FrostGroup {
             let kp = frost::keys::KeyPackage::try_from(ss.clone())?;
             let xid = *rev
                 .get(id)
-                .ok_or_else(|| anyhow!("unknown identifier from dealer"))?;
+                .ok_or_else(|| Error::msg("unknown identifier from dealer"))?;
             participants.insert(xid, FrostParticipant::new(xid, kp));
         }
 

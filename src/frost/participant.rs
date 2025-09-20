@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::{Result, anyhow};
+use crate::{Error, Result};
 use bc_components::{ARID, DigestProvider, XID};
 use frost_secp256k1_tr::{
     self as frost, Identifier,
@@ -42,11 +42,11 @@ impl FrostParticipant {
         let hid = comms
             .hiding()
             .serialize()
-            .map_err(|e| anyhow!("serialize hiding commitment: {e}"))?;
+            .map_err(|e| Error::msg(format!("serialize hiding commitment: {e}")))?;
         let bind = comms
             .binding()
             .serialize()
-            .map_err(|e| anyhow!("serialize binding commitment: {e}"))?;
+            .map_err(|e| Error::msg(format!("serialize binding commitment: {e}")))?;
         FrostSigningCommitment::new(self.xid, session, &hid, &bind)
     }
 
@@ -57,10 +57,10 @@ impl FrostParticipant {
         signing_pkg: &FrostSigningPackage,
     ) -> Result<FrostSignatureShare> {
         let nonces = self.nonces.as_ref().ok_or_else(|| {
-            anyhow!(
+            Error::msg(format!(
                 "round1_commit must be called before round2_sign for signer {}",
                 self.xid
-            )
+            ))
         })?;
 
         // Convert commitments to frost SigningPackage
@@ -69,9 +69,9 @@ impl FrostParticipant {
         for comm in &signing_pkg.commitments {
             let id = group.id_for_xid(&comm.xid)?;
             let hiding = NonceCommitment::deserialize(comm.hiding.as_ref())
-                .map_err(|e| anyhow!("deserialize hiding: {e}"))?;
+                .map_err(|e| Error::msg(format!("deserialize hiding: {e}")))?;
             let binding = NonceCommitment::deserialize(comm.binding.as_ref())
-                .map_err(|e| anyhow!("deserialize binding: {e}"))?;
+                .map_err(|e| Error::msg(format!("deserialize binding: {e}")))?;
             frost_commitments
                 .insert(id, SigningCommitments::new(hiding, binding));
         }
@@ -83,7 +83,7 @@ impl FrostParticipant {
 
         let share = frost::round2::sign(&frost_sp, nonces, &self.key_package)
             .map_err(|e| {
-            anyhow!("round2 sign failed for {}: {e}", self.xid)
+                Error::msg(format!("round2 sign failed for {}: {e}", self.xid))
         })?;
         Ok(FrostSignatureShare {
             xid: self.xid,

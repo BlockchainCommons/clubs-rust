@@ -1,6 +1,7 @@
 use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
 use known_values::HOLDER;
+use crate::{Error, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrostSigningCommitment {
@@ -16,14 +17,14 @@ impl FrostSigningCommitment {
         session: ARID,
         hiding: impl AsRef<[u8]>,
         binding: impl AsRef<[u8]>,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self> {
         let h = hiding.as_ref();
         let b = binding.as_ref();
         if h.len() != 33 {
-            anyhow::bail!("invalid hiding length: {}", h.len());
+            return Err(Error::msg(format!("invalid hiding length: {}", h.len())));
         }
         if b.len() != 33 {
-            anyhow::bail!("invalid binding length: {}", b.len());
+            return Err(Error::msg(format!("invalid binding length: {}", b.len())));
         }
         Ok(Self {
             xid,
@@ -47,13 +48,13 @@ impl From<FrostSigningCommitment> for Envelope {
 }
 
 impl TryFrom<Envelope> for FrostSigningCommitment {
-    type Error = anyhow::Error;
-    fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
+    type Error = Error;
+    fn try_from(envelope: Envelope) -> Result<Self> {
         envelope.check_type_envelope("FrostSigningCommitment")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
-            anyhow::bail!("unexpected subject for FrostSigningCommitment");
+            return Err(Error::msg("unexpected subject for FrostSigningCommitment"));
         }
         let xid: XID = envelope.try_object_for_predicate(HOLDER)?;
         let session: ARID = envelope.try_object_for_predicate("session")?;
@@ -61,10 +62,10 @@ impl TryFrom<Envelope> for FrostSigningCommitment {
         let binding: ByteString =
             envelope.try_object_for_predicate("binding")?;
         if hiding.len() != 33 {
-            anyhow::bail!("invalid hiding length");
+            return Err(Error::msg("invalid hiding length"));
         }
         if binding.len() != 33 {
-            anyhow::bail!("invalid binding length");
+            return Err(Error::msg("invalid binding length"));
         }
         Ok(FrostSigningCommitment { xid, session, hiding, binding })
     }

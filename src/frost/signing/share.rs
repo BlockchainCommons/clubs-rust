@@ -1,5 +1,6 @@
 use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
+use crate::{Error, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrostSignatureShare {
@@ -20,13 +21,13 @@ impl From<FrostSignatureShare> for Envelope {
 }
 
 impl TryFrom<Envelope> for FrostSignatureShare {
-    type Error = anyhow::Error;
-    fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
+    type Error = Error;
+    fn try_from(envelope: Envelope) -> Result<Self> {
         envelope.check_type_envelope("FrostSignatureShare")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
-            anyhow::bail!("unexpected subject for FrostSignatureShare");
+            return Err(Error::msg("unexpected subject for FrostSignatureShare"));
         }
         let xid: XID = envelope.try_object_for_predicate(known_values::HOLDER)?;
         let session: ARID = envelope.try_object_for_predicate("session")?;

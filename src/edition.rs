@@ -14,17 +14,17 @@
 //! - Write-group/threshold signing is represented via simple add-signature
 //!   helpers.
 
-use anyhow::{Result, anyhow, bail};
+use crate::public_key_permit::PublicKeyPermit;
+use crate::{Error, Result};
 use bc_components::{
     Digest, DigestProvider, SSKRSpec, Signature, SymmetricKey, XID,
 };
 use bc_envelope::prelude::*;
 use known_values::{
-    CONTENT, CONTENT_RAW, HAS_RECIPIENT_RAW, HOLDER, IS_A_RAW, PROVENANCE, PROVENANCE_RAW, SIGNED, SIGNED_RAW
+    CONTENT, CONTENT_RAW, HAS_RECIPIENT_RAW, HOLDER, IS_A_RAW, PROVENANCE,
+    PROVENANCE_RAW, SIGNED, SIGNED_RAW,
 };
 use provenance_mark::ProvenanceMark;
-
-use crate::public_key_permit::PublicKeyPermit;
 
 /// A single edition (revision) of a Club's content.
 #[derive(Clone, Debug, PartialEq)]
@@ -150,9 +150,9 @@ impl Edition {
                         edition = edition.add_assertion_envelope(assertion)?;
                     }
                     PublicKeyPermit::Decode { .. } => {
-                        bail!(
-                            "Cannot use decode permit when sealing a new edition"
-                        );
+                        return Err(Error::msg(
+                            "Cannot use decode permit when sealing a new edition",
+                        ));
                     }
                 }
             }
@@ -180,7 +180,7 @@ impl From<Edition> for Envelope {
 
 // EnvelopeDecodable via TryFrom<Envelope>
 impl TryFrom<Envelope> for Edition {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_from(envelope: Envelope) -> Result<Self> {
         envelope.check_type_envelope("Edition")?;
@@ -202,13 +202,13 @@ impl TryFrom<Envelope> for Edition {
                 }
                 PROVENANCE_RAW => {
                     if provenance.is_some() {
-                        return Err(anyhow!("Multiple provenance marks"));
+                        return Err(Error::msg("Multiple provenance marks"));
                     }
                     provenance = Some(ProvenanceMark::try_from(obj.clone())?);
                 }
                 CONTENT_RAW => {
                     if content.is_some() {
-                        return Err(anyhow!("Multiple content assertions"));
+                        return Err(Error::msg("Multiple content assertions"));
                     }
                     // Object is an Envelope; clone it.
                     content = Some(obj.clone());
@@ -245,7 +245,7 @@ impl TryFrom<Envelope> for Edition {
                     }
                 }
                 _ => {
-                    return Err(anyhow!(
+                    return Err(Error::msg(
                         "Unexpected predicate in Edition envelope"
                     ));
                 }
@@ -253,9 +253,15 @@ impl TryFrom<Envelope> for Edition {
         }
 
         let provenance =
-            provenance.ok_or_else(|| anyhow!("Missing provenance"))?;
-        let content = content.ok_or_else(|| anyhow!("Missing content"))?;
+            provenance.ok_or_else(|| Error::msg("Missing provenance"))?;
+        let content = content.ok_or_else(|| Error::msg("Missing content"))?;
 
-        Ok(Edition { club_id: club, provenance, content, signatures, permits })
+        Ok(Edition {
+            club_id: club,
+            provenance,
+            content,
+            signatures,
+            permits,
+        })
     }
 }
