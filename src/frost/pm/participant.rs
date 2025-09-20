@@ -38,9 +38,13 @@ impl FrostPmParticipant {
         }
     }
 
-    pub fn from_core(core: FrostParticipantCore) -> Self { Self::new(core) }
+    pub fn from_core(core: FrostParticipantCore) -> Self {
+        Self::new(core)
+    }
 
-    pub fn xid(&self) -> XID { self.core.xid() }
+    pub fn xid(&self) -> XID {
+        self.core.xid()
+    }
 
     fn key_package(&self) -> &frost::keys::KeyPackage {
         self.core.key_package()
@@ -48,7 +52,7 @@ impl FrostPmParticipant {
 
     /// Round-1: generate per-signer commitments A=k·G and B=k·H for the
     /// provided hash point H.
-    pub fn pm_round1_commit(
+    pub fn round1_commit(
         &mut self,
         session: ARID,
         h_point: &ProjectivePoint,
@@ -80,14 +84,14 @@ impl FrostPmParticipant {
 
     /// Round-2a: given the coordinator package, emit the participant's
     /// contribution to Γ.
-    pub fn pm_round2_emit_gamma(
+    pub fn round2_emit_gamma(
         &mut self,
         _group: &FrostGroup,
         package: &FrostPmSigningPackage,
     ) -> Result<FrostPmGammaShare> {
-        let session = self.session.ok_or_else(|| {
-            Error::msg("pm_round1_commit must be called first")
-        })?;
+        let session = self
+            .session
+            .ok_or_else(|| Error::msg("round1_commit must be called first"))?;
         if package.session != session {
             return Err(Error::msg("signing package session mismatch"));
         }
@@ -110,18 +114,18 @@ impl FrostPmParticipant {
 
     /// Round-2b: after receiving the challenge, emit the participant's partial
     /// `z` response.
-    pub fn pm_finalize_response(
+    pub fn finalize_response(
         &mut self,
         challenge: &Scalar,
     ) -> Result<FrostPmResponseShare> {
         let session = self.session.ok_or_else(|| {
-            Error::msg("pm_round1_commit must be called first")
+            Error::msg("round1_commit must be called first")
         })?;
         let nonce = self.nonce.ok_or_else(|| {
-            Error::msg("pm_round2_emit_gamma must be called first")
+            Error::msg("round2_emit_gamma must be called first")
         })?;
         let lambda_share = self.lambda_share.ok_or_else(|| {
-            Error::msg("pm_round2_emit_gamma must be called first")
+            Error::msg("round2_emit_gamma must be called first")
         })?;
 
         let z_share = nonce + (*challenge * lambda_share);

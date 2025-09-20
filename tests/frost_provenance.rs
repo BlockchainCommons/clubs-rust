@@ -49,7 +49,7 @@ fn run_ceremony(
         let signer = participants.get_mut(xid).ok_or_else(|| {
             clubs::Error::msg(format!("unknown participant: {}", xid))
         })?;
-        let commitment = signer.pm_round1_commit(session, &h_point)?;
+        let commitment = signer.round1_commit(session, &h_point)?;
         coordinator.add_commitment(commitment)?;
     }
 
@@ -59,7 +59,7 @@ fn run_ceremony(
             clubs::Error::msg(format!("unknown participant: {}", xid))
         })?;
         let gamma_share =
-            signer.pm_round2_emit_gamma(chain.group(), &signing_package)?;
+            signer.round2_emit_gamma(chain.group(), &signing_package)?;
         coordinator.record_gamma_share(gamma_share)?;
     }
 
@@ -68,7 +68,7 @@ fn run_ceremony(
         let signer = participants.get_mut(xid).ok_or_else(|| {
             clubs::Error::msg(format!("unknown participant: {}", xid))
         })?;
-        let response = signer.pm_finalize_response(&challenge)?;
+        let response = signer.finalize_response(&challenge)?;
         coordinator.record_response(response)?;
     }
 
