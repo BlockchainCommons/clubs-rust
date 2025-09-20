@@ -1,8 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::{Error, Result};
-use bc_components::DigestProvider;
-use bc_components::Signature;
+use bc_components::{DigestProvider, Signature};
 use bc_envelope::prelude::*;
 use frost_secp256k1_tr::round1::{NonceCommitment, SigningCommitments};
 
@@ -10,6 +8,7 @@ use super::{
     group::FrostGroup,
     signing::{FrostSignatureShares, FrostSigningPackage},
 };
+use crate::{Error, Result};
 
 /// Attach a pre-aggregated BIP-340 signature to the envelope and verify with
 /// the group's public key.

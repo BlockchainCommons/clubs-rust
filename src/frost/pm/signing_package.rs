@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use bc_components::{ARID, XID};
 use k256::{ProjectivePoint, Scalar};
 
-/// Signing package distributed by the coordinator prior to computing VRF shares.
+/// Signing package distributed by the coordinator prior to computing VRF
+/// shares.
 #[derive(Clone, Debug)]
 pub struct FrostPmSigningPackage {
     pub session: ARID,

@@ -1,7 +1,8 @@
-use super::commitment::FrostSigningCommitment;
-use crate::{Error, Result};
 use bc_components::ARID;
 use bc_envelope::prelude::*;
+
+use super::commitment::FrostSigningCommitment;
+use crate::{Error, Result};
 
 #[derive(Clone, Debug)]
 pub struct FrostSigningPackage {
@@ -70,9 +71,10 @@ impl TryFrom<Envelope> for FrostSigningPackage {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bc_components::XID;
     use indoc::indoc;
+
+    use super::*;
 
     #[test]
     fn frost_signing_package_roundtrip_text() {

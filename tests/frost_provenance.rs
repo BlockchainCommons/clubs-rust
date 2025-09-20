@@ -5,8 +5,8 @@ use bc_xid::XIDDocument;
 use clubs::frost::{
     FrostGroup,
     pm::{
-        DleqProof, FrostPmCoordinator, FrostPmParticipant, FrostProvenanceChain,
-        key_from_gamma, point_bytes,
+        DleqProof, FrostPmCoordinator, FrostPmParticipant,
+        FrostProvenanceChain, key_from_gamma, point_bytes,
     },
 };
 use dcbor::Date;
@@ -19,7 +19,9 @@ struct Advance {
     proof: DleqProof,
 }
 
-fn iso_date(date: &str) -> Date { Date::from_string(date).expect("valid ISO-8601 date") }
+fn iso_date(date: &str) -> Date {
+    Date::from_string(date).expect("valid ISO-8601 date")
+}
 
 fn collect_marks(advances: &[Advance]) -> Vec<ProvenanceMark> {
     advances.iter().map(|a| a.mark.clone()).collect()
@@ -33,7 +35,9 @@ fn run_ceremony(
     date: Date,
 ) -> clubs::Result<Advance> {
     if date < *chain.last_date() {
-        return Err(clubs::Error::msg("provenance date must be non-decreasing"));
+        return Err(clubs::Error::msg(
+            "provenance date must be non-decreasing",
+        ));
     }
 
     let (_, _, h_point) = chain.next_message()?;
@@ -54,7 +58,8 @@ fn run_ceremony(
         let signer = participants.get_mut(xid).ok_or_else(|| {
             clubs::Error::msg(format!("unknown participant: {}", xid))
         })?;
-        let gamma_share = signer.pm_round2_emit_gamma(chain.group(), &signing_package)?;
+        let gamma_share =
+            signer.pm_round2_emit_gamma(chain.group(), &signing_package)?;
         coordinator.record_gamma_share(gamma_share)?;
     }
 
@@ -98,15 +103,14 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
         XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
 
     let members = vec![alice_doc.xid(), bob_doc.xid(), charlie_doc.xid()];
-    let (group, signing_participants): (
+    let (group, participant_cores): (
         FrostGroup,
-        BTreeMap<XID, clubs::frost::FrostSigningParticipant>,
-    ) =
-        FrostGroup::new_with_trusted_dealer(2, members.clone())?;
+        BTreeMap<XID, clubs::frost::FrostParticipantCore>,
+    ) = FrostGroup::new_with_trusted_dealer(2, members.clone())?;
 
-    let mut participants: BTreeMap<XID, FrostPmParticipant> = signing_participants
-        .iter()
-        .map(|(xid, signer)| (*xid, FrostPmParticipant::from_signing(signer)))
+    let mut participants: BTreeMap<XID, FrostPmParticipant> = participant_cores
+        .into_iter()
+        .map(|(xid, core)| (xid, FrostPmParticipant::from_core(core)))
         .collect();
 
     let genesis = iso_date("2025-01-01");
@@ -152,7 +156,11 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
             date,
         )?;
 
-        verifier_chain.verify_advance(&advance.mark, &advance.gamma_bytes, &advance.proof)?;
+        verifier_chain.verify_advance(
+            &advance.mark,
+            &advance.gamma_bytes,
+            &advance.proof,
+        )?;
         advances.push(advance);
 
         eprintln!("{}", blurb);

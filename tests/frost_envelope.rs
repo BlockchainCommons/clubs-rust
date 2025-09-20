@@ -1,7 +1,7 @@
 use bc_components::XIDProvider;
 use bc_envelope::{PrivateKeyBase, prelude::*};
 use bc_xid::XIDDocument;
-use clubs::frost::{FrostCoordinator, FrostGroup};
+use clubs::frost::{FrostCoordinator, FrostGroup, FrostSigningParticipant};
 use indoc::indoc;
 
 #[test]
@@ -23,8 +23,12 @@ fn frost_two_of_three_signs_envelope_and_verify() {
         .wrap();
     // --- Build FrostGroup of all participants using Trusted Dealer ---
     let members = vec![alice_doc.xid(), bob_doc.xid(), charlie_doc.xid()];
-    let (group, mut participants) =
+    let (group, participant_cores) =
         FrostGroup::new_with_trusted_dealer(2, members).unwrap();
+    let mut participants: std::collections::BTreeMap<_, _> = participant_cores
+        .into_iter()
+        .map(|(xid, core)| (xid, FrostSigningParticipant::from_core(core)))
+        .collect();
 
     // Materialize participant contexts from the map
     let mut alice_participant = participants.remove(&alice_doc.xid()).unwrap();
@@ -37,7 +41,8 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     coordinator.set_message(message);
     let session_id = coordinator.session_id();
 
-    // Round-1: each participant in the roster generates a commitment and sends it to coordinator
+    // Round-1: each participant in the roster generates a commitment and sends
+    // it to coordinator
     let alice_commitment = alice_participant.round1_commit(session_id).unwrap();
     coordinator
         .add_commitment(alice_commitment.clone())
@@ -52,13 +57,15 @@ fn frost_two_of_three_signs_envelope_and_verify() {
         charlie_participant.round1_commit(session_id).unwrap();
     coordinator.add_commitment(charlie_commitment).unwrap();
 
-    // Coordinator records explicit consent after participants review the message
+    // Coordinator records explicit consent after participants review the
+    // message
     coordinator.record_consent(alice_doc.xid()).unwrap();
     coordinator.record_consent(bob_doc.xid()).unwrap();
     // Coordinator compiles a signing package from the consenting roster
     let signing_package = coordinator.signing_package_from_consent().unwrap();
 
-    // Round-2: each selected participant produces their signature share locally and sends it back
+    // Round-2: each selected participant produces their signature share locally
+    // and sends it back
     let alice_share = alice_participant
         .round2_sign(&group, &signing_package)
         .unwrap();
@@ -71,7 +78,8 @@ fn frost_two_of_three_signs_envelope_and_verify() {
         .unwrap();
     coordinator.add_share(bob_share.clone()).unwrap();
 
-    // Coordinator aggregates shares and attaches the final signature to the message
+    // Coordinator aggregates shares and attaches the final signature to the
+    // message
     let signed_envelope = coordinator.finalize().unwrap();
 
     #[rustfmt::skip]

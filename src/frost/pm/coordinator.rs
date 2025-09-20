@@ -3,18 +3,20 @@ use std::collections::{BTreeMap, BTreeSet};
 use bc_components::{ARID, XID};
 use k256::{ProjectivePoint, Scalar};
 
-use crate::frost::{
-    group::FrostGroup,
-    pm::{
-        commitment::FrostPmCommitment,
-        gamma_share::FrostPmGammaShare,
-        primitives::{dleq_challenge, point_bytes},
-        response_share::FrostPmResponseShare,
-        signing_package::FrostPmSigningPackage,
-        DleqProof,
+use crate::{
+    Error, Result,
+    frost::{
+        group::FrostGroup,
+        pm::{
+            DleqProof,
+            commitment::FrostPmCommitment,
+            gamma_share::FrostPmGammaShare,
+            primitives::{dleq_challenge, point_bytes},
+            response_share::FrostPmResponseShare,
+            signing_package::FrostPmSigningPackage,
+        },
     },
 };
-use crate::{Error, Result};
 
 pub struct FrostPmCoordinator {
     group: FrostGroup,
@@ -47,13 +49,9 @@ impl FrostPmCoordinator {
         }
     }
 
-    pub fn group(&self) -> &FrostGroup {
-        &self.group
-    }
+    pub fn group(&self) -> &FrostGroup { &self.group }
 
-    pub fn session_id(&self) -> ARID {
-        self.session_id
-    }
+    pub fn session_id(&self) -> ARID { self.session_id }
 
     pub fn set_session_id(&mut self, session: ARID) {
         self.session_id = session;

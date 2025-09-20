@@ -3,12 +3,17 @@ use k256::ProjectivePoint;
 use provenance_mark::{ProvenanceMark, ProvenanceMarkResolution};
 use sha2::{Digest, Sha256};
 
-use crate::frost::group::FrostGroup;
-use crate::frost::pm::primitives::{
-    DleqProof, expand_mark_key, hash_to_curve, key_from_gamma, pm_message,
-    point_bytes, point_from_bytes, ratchet_state, vrf_verify_for_x,
+use crate::{
+    Error, Result,
+    frost::{
+        group::FrostGroup,
+        pm::primitives::{
+            DleqProof, expand_mark_key, hash_to_curve, key_from_gamma,
+            pm_message, point_bytes, point_from_bytes, ratchet_state,
+            vrf_verify_for_x,
+        },
+    },
 };
-use crate::{Error, Result};
 
 const GENESIS_DST: &[u8] = b"PM-Genesis";
 const CHAIN_ID_DST: &[u8] = b"PM-CHAIN-ID";
@@ -41,13 +46,14 @@ pub struct FrostProvenanceChain {
     /// How long each link in the chain is (short, medium, etc.) so humans know
     /// what sort of identifier to expect.
     resolution: ProvenanceMarkResolution,
-    /// Public anchor that identifies this chain; stays the same no matter which
-    /// quorum advances it.
+    /// Public anchor that identifies this chain; stays the same no matter
+    /// which quorum advances it.
     chain_id: Vec<u8>,
     /// The FROST group that controls the chain (kept for convenience when
     /// orchestrating ceremonies).
     group: FrostGroup,
-    /// The group’s shared public key point on the curve; needed for VRF checks.
+    /// The group’s shared public key point on the curve; needed for VRF
+    /// checks.
     group_point: ProjectivePoint,
 
     // --- Rolling state (updates every time a new mark is published) ---
@@ -56,7 +62,8 @@ pub struct FrostProvenanceChain {
     /// Public “memory” derived from prior marks so anyone can build the next
     /// VRF message deterministically.
     ratchet_state: [u8; 32],
-    /// How many marks have been published so far (starting at zero for genesis).
+    /// How many marks have been published so far (starting at zero for
+    /// genesis).
     sequence: u32,
     /// Timestamp attached to the most recent mark, used to ensure time never
     /// moves backwards.
@@ -86,18 +93,10 @@ impl FrostProvenanceChain {
         })
     }
 
-    pub fn chain_id(&self) -> &[u8] {
-        &self.chain_id
-    }
-    pub fn sequence(&self) -> u32 {
-        self.sequence
-    }
-    pub fn last_date(&self) -> &Date {
-        &self.last_date
-    }
-    pub fn resolution(&self) -> ProvenanceMarkResolution {
-        self.resolution
-    }
+    pub fn chain_id(&self) -> &[u8] { &self.chain_id }
+    pub fn sequence(&self) -> u32 { self.sequence }
+    pub fn last_date(&self) -> &Date { &self.last_date }
+    pub fn resolution(&self) -> ProvenanceMarkResolution { self.resolution }
     pub fn group(&self) -> &FrostGroup { &self.group }
     pub fn last_key(&self) -> &[u8] { &self.last_key }
 

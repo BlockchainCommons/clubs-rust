@@ -20,9 +20,7 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn msg(msg: impl Into<String>) -> Self {
-        Error::General(msg.into())
-    }
+    pub fn msg(msg: impl Into<String>) -> Self { Error::General(msg.into()) }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

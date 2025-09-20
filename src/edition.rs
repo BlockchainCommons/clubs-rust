@@ -14,8 +14,6 @@
 //! - Write-group/threshold signing is represented via simple add-signature
 //!   helpers.
 
-use crate::public_key_permit::PublicKeyPermit;
-use crate::{Error, Result};
 use bc_components::{
     Digest, DigestProvider, SSKRSpec, SealedMessage, Signature, Signer,
     SymmetricKey, XID,
@@ -26,6 +24,8 @@ use known_values::{
     PROVENANCE_RAW, SIGNED, SIGNED_RAW,
 };
 use provenance_mark::ProvenanceMark;
+
+use crate::{Error, Result, public_key_permit::PublicKeyPermit};
 
 /// A single edition (revision) of a Club's content.
 #[derive(Clone, Debug, PartialEq)]
@@ -174,9 +174,7 @@ impl Edition {
 
 // EnvelopeEncodable via Into<Envelope>
 impl From<Edition> for Envelope {
-    fn from(value: Edition) -> Self {
-        value.to_unsigned_envelope()
-    }
+    fn from(value: Edition) -> Self { value.to_unsigned_envelope() }
 }
 
 // EnvelopeDecodable via TryFrom<Envelope>

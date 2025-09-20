@@ -1,7 +1,8 @@
-use crate::{Error, Result};
 use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
 use known_values::HOLDER;
+
+use crate::{Error, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrostSigningCommitment {
@@ -81,8 +82,9 @@ impl TryFrom<Envelope> for FrostSigningCommitment {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use indoc::indoc;
+
+    use super::*;
 
     #[test]
     fn frost_signing_commitment_roundtrip_text() {

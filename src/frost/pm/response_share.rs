@@ -1,6 +1,5 @@
 use bc_components::{ARID, XID};
-use k256::{FieldBytes, Scalar};
-use k256::elliptic_curve::PrimeField;
+use k256::{FieldBytes, Scalar, elliptic_curve::PrimeField};
 
 use crate::{Error, Result};
 
@@ -13,9 +12,7 @@ fn scalar_from_be_bytes(bytes: &[u8]) -> Result<Scalar> {
         .ok_or_else(|| Error::msg("scalar out of range"))
 }
 
-fn scalar_to_be_bytes(scalar: &Scalar) -> [u8; 32] {
-    scalar.to_bytes().into()
-}
+fn scalar_to_be_bytes(scalar: &Scalar) -> [u8; 32] { scalar.to_bytes().into() }
 
 /// Participant response share for the DLEQ proof (partial `z`).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,7 +23,7 @@ pub struct FrostPmResponseShare {
 }
 
 impl FrostPmResponseShare {
-pub fn to_scalar(&self) -> Result<Scalar> {
+    pub fn to_scalar(&self) -> Result<Scalar> {
         scalar_from_be_bytes(&self.z_bytes)
     }
 

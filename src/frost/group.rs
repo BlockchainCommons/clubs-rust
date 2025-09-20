@@ -1,15 +1,15 @@
 use std::collections::BTreeMap;
 
-use crate::{Error, Result};
 use bc_components::{SchnorrPublicKey, SigningPublicKey, XID};
 use dcbor::prelude::*;
 use frost_secp256k1_tr::{self as frost, Identifier};
-use k256::elliptic_curve::PrimeField;
-use k256::elliptic_curve::sec1::FromEncodedPoint;
-use k256::{AffinePoint, EncodedPoint, FieldBytes, ProjectivePoint, Scalar};
+use k256::{
+    AffinePoint, EncodedPoint, FieldBytes, ProjectivePoint, Scalar,
+    elliptic_curve::{PrimeField, sec1::FromEncodedPoint},
+};
 use rand::rngs::OsRng; // ByteString
 
-use crate::frost::signing::participant::FrostSigningParticipant;
+use crate::{Error, Result, frost::participant_core::FrostParticipantCore};
 
 // Internal public key package used by the group; not exposed outside this
 // module tree.
@@ -238,12 +238,12 @@ impl FrostGroup {
     }
 
     /// Create a FROST group with a trusted dealer and return signer contexts.
-    /// Returns the group and a map of XID -> FrostSigningParticipant (each holding its
-    /// secret share).
+    /// Returns the group and a map of XID -> FrostParticipantCore (each holding
+    /// its secret share).
     pub fn new_with_trusted_dealer(
         threshold: usize,
         members: Vec<XID>,
-    ) -> Result<(Self, BTreeMap<XID, FrostSigningParticipant>)> {
+    ) -> Result<(Self, BTreeMap<XID, FrostParticipantCore>)> {
         let max = members.len() as u16;
         let min = threshold as u16;
         // Assign Identifiers internally in order 1..=n
@@ -265,7 +265,7 @@ impl FrostGroup {
             )?;
 
         // Build participant contexts (each with its own secret share)
-        let mut participants: BTreeMap<XID, FrostSigningParticipant> =
+        let mut participants: BTreeMap<XID, FrostParticipantCore> =
             BTreeMap::new();
         // Reverse map Identifier -> XID
         let mut rev: BTreeMap<Identifier, XID> = BTreeMap::new();
@@ -277,7 +277,7 @@ impl FrostGroup {
             let xid = *rev
                 .get(id)
                 .ok_or_else(|| Error::msg("unknown identifier from dealer"))?;
-            participants.insert(xid, FrostSigningParticipant::new(xid, kp));
+            participants.insert(xid, FrostParticipantCore::new(xid, kp));
         }
 
         let pubkey_pkg =

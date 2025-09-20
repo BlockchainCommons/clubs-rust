@@ -1,15 +1,17 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{Error, Result};
 use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
 
-use super::aggregate::aggregate_and_attach_signature;
-use super::group::FrostGroup;
-use super::signing::{
-    FrostSignatureShare, FrostSignatureShares, FrostSigningCommitment,
-    FrostSigningPackage, build_signing_package,
+use super::{
+    aggregate::aggregate_and_attach_signature,
+    group::FrostGroup,
+    signing::{
+        FrostSignatureShare, FrostSignatureShares, FrostSigningCommitment,
+        FrostSigningPackage, build_signing_package,
+    },
 };
+use crate::{Error, Result};
 
 /// A neutral coordinator for a FROST signing ceremony.
 ///
@@ -20,7 +22,8 @@ use super::signing::{
 pub struct FrostCoordinator {
     group: FrostGroup,
     message: Option<Envelope>,
-    // Track per-member commitments and shares for idempotency and conflict detection
+    // Track per-member commitments and shares for idempotency and conflict
+    // detection
     commitments: BTreeMap<XID, FrostSigningCommitment>,
     shares: BTreeMap<XID, FrostSignatureShare>,
     // The signing package prepared for this ceremony (selected roster)
@@ -44,12 +47,8 @@ impl FrostCoordinator {
         }
     }
 
-    pub fn group(&self) -> &FrostGroup {
-        &self.group
-    }
-    pub fn session_id(&self) -> ARID {
-        self.session_id
-    }
+    pub fn group(&self) -> &FrostGroup { &self.group }
+    pub fn session_id(&self) -> ARID { self.session_id }
     pub fn set_session_id(&mut self, session_id: ARID) {
         self.session_id = session_id;
     }
@@ -109,7 +108,8 @@ impl FrostCoordinator {
 
     /// Build the signing package using only the specified roster of members.
     /// This allows collecting commitments from all members, while selecting a
-    /// subset (>= threshold) for this ceremony. Stores the package for finalize().
+    /// subset (>= threshold) for this ceremony. Stores the package for
+    /// finalize().
     pub fn signing_package_for(
         &mut self,
         roster: &[XID],
@@ -144,7 +144,8 @@ impl FrostCoordinator {
         Ok(pkg)
     }
 
-    /// Build a signing package using all consenting members (who also provided commitments).
+    /// Build a signing package using all consenting members (who also provided
+    /// commitments).
     pub fn signing_package_from_consent(
         &mut self,
     ) -> Result<FrostSigningPackage> {

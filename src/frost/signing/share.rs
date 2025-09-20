@@ -1,6 +1,7 @@
-use crate::{Error, Result};
 use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
+
+use crate::{Error, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrostSignatureShare {
@@ -43,8 +44,9 @@ impl TryFrom<Envelope> for FrostSignatureShare {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use indoc::indoc;
+
+    use super::*;
 
     #[test]
     fn frost_signature_share_roundtrip_text() {

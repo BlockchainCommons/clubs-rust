@@ -1,8 +1,7 @@
 use bc_components::{ARID, XID};
 use k256::ProjectivePoint;
 
-use crate::frost::pm::primitives::point_from_bytes;
-use crate::Result;
+use crate::{Result, frost::pm::primitives::point_from_bytes};
 
 /// Participant contribution to the VRF output Γ.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -46,9 +46,7 @@ pub enum FrostPmError {
 pub type Result<T> = std::result::Result<T, FrostPmError>;
 
 impl From<FrostPmError> for crate::Error {
-    fn from(err: FrostPmError) -> Self {
-        crate::Error::msg(err.to_string())
-    }
+    fn from(err: FrostPmError) -> Self { crate::Error::msg(err.to_string()) }
 }
 
 /// Compact DLEQ proof that `log_G(X) = log_H(Gamma)`.
@@ -134,7 +132,8 @@ fn dleq_challenge_x(
     Ok(<frost::Secp256K1Sha256TR as frost::Ciphersuite>::H2(&input))
 }
 
-/// Compute the VRF output `Gamma = x·H` and return it together with a DLEQ proof.
+/// Compute the VRF output `Gamma = x·H` and return it together with a DLEQ
+/// proof.
 pub fn vrf_gamma_and_proof_for_x(
     x: &Scalar,
     x_point: &ProjectivePoint,
@@ -242,7 +241,8 @@ pub fn ratchet_state(state_prev: &[u8; 32], key_j: &[u8; 32]) -> [u8; 32] {
     next
 }
 
-/// Ensure a reconstructed secret scalar matches the published group key with Taproot parity.
+/// Ensure a reconstructed secret scalar matches the published group key with
+/// Taproot parity.
 pub fn normalize_secret_to_pubkey(
     mut x: Scalar,
     expected: &ProjectivePoint,

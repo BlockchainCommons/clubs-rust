@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use crate::{Error, Result};
 use bc_components::{ARID, DigestProvider, XID};
 use frost_secp256k1_tr::{
     self as frost, Identifier,
@@ -8,29 +7,34 @@ use frost_secp256k1_tr::{
 };
 use rand::rngs::OsRng;
 
-use crate::frost::{
-    group::FrostGroup,
-    signing::{
-        FrostSignatureShare, FrostSigningCommitment, FrostSigningPackage,
+use crate::{
+    Error, Result,
+    frost::{
+        group::FrostGroup,
+        participant_core::FrostParticipantCore,
+        signing::{
+            FrostSignatureShare, FrostSigningCommitment, FrostSigningPackage,
+        },
     },
 };
 
 #[derive(Clone)]
 pub struct FrostSigningParticipant {
-    xid: XID,
-    key_package: frost::keys::KeyPackage,
+    core: FrostParticipantCore,
     nonces: Option<frost::round1::SigningNonces>,
 }
 
 impl FrostSigningParticipant {
-    pub fn new(xid: XID, key_package: frost::keys::KeyPackage) -> Self {
-        Self { xid, key_package, nonces: None }
+    pub fn new(core: FrostParticipantCore) -> Self {
+        Self { core, nonces: None }
     }
 
-    pub fn xid(&self) -> XID { self.xid }
+    pub fn from_core(core: FrostParticipantCore) -> Self { Self::new(core) }
+
+    pub fn xid(&self) -> XID { self.core.xid() }
 
     pub(crate) fn key_package(&self) -> &frost::keys::KeyPackage {
-        &self.key_package
+        self.core.key_package()
     }
 
     /// Perform Round-1 locally: generate nonces and commitments. Stores nonces
@@ -39,8 +43,10 @@ impl FrostSigningParticipant {
         &mut self,
         session: ARID,
     ) -> Result<FrostSigningCommitment> {
-        let (nonces, comms) =
-            frost::round1::commit(self.key_package.signing_share(), &mut OsRng);
+        let (nonces, comms) = frost::round1::commit(
+            self.key_package().signing_share(),
+            &mut OsRng,
+        );
         self.nonces = Some(nonces);
         let hid = comms.hiding().serialize().map_err(|e| {
             Error::msg(format!("serialize hiding commitment: {e}"))
@@ -48,7 +54,7 @@ impl FrostSigningParticipant {
         let bind = comms.binding().serialize().map_err(|e| {
             Error::msg(format!("serialize binding commitment: {e}"))
         })?;
-        FrostSigningCommitment::new(self.xid, session, &hid, &bind)
+        FrostSigningCommitment::new(self.xid(), session, &hid, &bind)
     }
 
     /// Perform Round-2 locally: produce a signature share using stored nonces.
@@ -60,7 +66,7 @@ impl FrostSigningParticipant {
         let nonces = self.nonces.as_ref().ok_or_else(|| {
             Error::msg(format!(
                 "round1_commit must be called before round2_sign for signer {}",
-                self.xid
+                self.xid()
             ))
         })?;
 
@@ -72,7 +78,9 @@ impl FrostSigningParticipant {
             let hiding = NonceCommitment::deserialize(comm.hiding.as_ref())
                 .map_err(|e| Error::msg(format!("deserialize hiding: {e}")))?;
             let binding = NonceCommitment::deserialize(comm.binding.as_ref())
-                .map_err(|e| Error::msg(format!("deserialize binding: {e}")))?;
+                .map_err(|e| {
+                Error::msg(format!("deserialize binding: {e}"))
+            })?;
             frost_commitments
                 .insert(id, SigningCommitments::new(hiding, binding));
         }
@@ -82,12 +90,15 @@ impl FrostSigningParticipant {
         let msg_bytes: &[u8] = msg_digest.as_ref().as_ref();
         let frost_sp = frost::SigningPackage::new(frost_commitments, msg_bytes);
 
-        let share = frost::round2::sign(&frost_sp, nonces, &self.key_package)
+        let share = frost::round2::sign(&frost_sp, nonces, self.key_package())
             .map_err(|e| {
-                Error::msg(format!("round2 sign failed for {}: {e}", self.xid))
+                Error::msg(format!(
+                    "round2 sign failed for {}: {e}",
+                    self.xid()
+                ))
             })?;
         Ok(FrostSignatureShare {
-            xid: self.xid,
+            xid: self.xid(),
             session: signing_pkg.session,
             share: share.serialize(),
         })
