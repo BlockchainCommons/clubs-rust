@@ -25,6 +25,8 @@ pub const PM_KEY_DST: &[u8] = b"PMKEY-v1";
 pub const PM_STATE_DST: &[u8] = b"PMSTATE-v1";
 /// Prefix used when constructing the provenance mark VRF message.
 pub const PM_MESSAGE_PREFIX: &[u8] = b"PMVRF-secp256k1-v1";
+/// Domain separation tag for expanding truncated keys.
+pub const PM_KEY32_DST: &[u8] = b"PM-KEY32";
 
 /// Errors encountered while operating on the VRF / DLEQ primitives.
 #[derive(Debug, Error)]
@@ -257,4 +259,15 @@ pub fn normalize_secret_to_pubkey(
     }
 
     Err(FrostPmError::Relation("normalize-secret"))
+}
+
+/// Expand a truncated provenance mark key to 32 bytes for ratcheting.
+pub fn expand_mark_key(key_trunc: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(PM_KEY32_DST);
+    hasher.update(key_trunc);
+    let digest = hasher.finalize();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&digest);
+    out
 }

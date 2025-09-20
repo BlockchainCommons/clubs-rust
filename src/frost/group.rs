@@ -5,7 +5,8 @@ use bc_components::{SigningPublicKey, XID};
 use dcbor::prelude::*;
 use frost_secp256k1_tr::{self as frost, Identifier};
 use k256::elliptic_curve::PrimeField;
-use k256::{FieldBytes, Scalar};
+use k256::elliptic_curve::sec1::FromEncodedPoint;
+use k256::{AffinePoint, EncodedPoint, FieldBytes, ProjectivePoint, Scalar};
 use rand::rngs::OsRng; // ByteString
 
 use crate::frost::participant::FrostParticipant;
@@ -173,6 +174,19 @@ impl FrostGroup {
         &self,
     ) -> Result<frost_secp256k1_tr::keys::PublicKeyPackage> {
         self.pubkey_package.to_frost()
+    }
+
+    pub fn verifying_key_point(&self) -> Result<ProjectivePoint> {
+        let bytes = self.pubkey_package.verifying_key_sec1.as_ref();
+        if bytes.len() != 33 {
+            return Err(Error::msg("invalid verifying key length"));
+        }
+        let enc = EncodedPoint::from_bytes(bytes)
+            .map_err(|_| Error::msg("invalid verifying key encoding"))?;
+        let affine =
+            Option::<AffinePoint>::from(AffinePoint::from_encoded_point(&enc))
+                .ok_or_else(|| Error::msg("invalid verifying key point"))?;
+        Ok(ProjectivePoint::from(affine))
     }
 
     pub(super) fn lagrange_coefficients(

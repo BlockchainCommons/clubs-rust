@@ -1,8 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bc_components::{ARID, XID};
-use k256::elliptic_curve::sec1::FromEncodedPoint;
-use k256::{AffinePoint, EncodedPoint, ProjectivePoint, Scalar};
+use k256::{ProjectivePoint, Scalar};
 
 use crate::frost::{
     group::FrostGroup,
@@ -55,6 +54,19 @@ impl FrostPmCoordinator {
 
     pub fn set_session_id(&mut self, session: ARID) {
         self.session_id = session;
+    }
+
+    pub fn start_session(&mut self) {
+        self.session_id = ARID::new();
+        self.commitments.clear();
+        self.roster = None;
+        self.lambda_factors = None;
+        self.gamma_shares.clear();
+        self.responses.clear();
+        self.aggregated_a = None;
+        self.aggregated_b = None;
+        self.aggregated_gamma = None;
+        self.challenge = None;
     }
 
     pub fn add_commitment(
@@ -145,19 +157,6 @@ impl FrostPmCoordinator {
         Ok(())
     }
 
-    fn verifying_key_point(&self) -> Result<ProjectivePoint> {
-        let bytes = self.group.pubkey_package.verifying_key_sec1.as_ref();
-        if bytes.len() != 33 {
-            return Err(Error::msg("invalid verifying key length"));
-        }
-        let enc = EncodedPoint::from_bytes(bytes)
-            .map_err(|_| Error::msg("invalid verifying key encoding"))?;
-        let affine =
-            Option::<AffinePoint>::from(AffinePoint::from_encoded_point(&enc))
-                .ok_or_else(|| Error::msg("invalid verifying key point"))?;
-        Ok(ProjectivePoint::from(affine))
-    }
-
     fn aggregated_values(
         &mut self,
     ) -> Result<(
@@ -169,7 +168,7 @@ impl FrostPmCoordinator {
         if let (Some(a), Some(b), Some(gamma)) =
             (self.aggregated_a, self.aggregated_b, self.aggregated_gamma)
         {
-            let x_point = self.verifying_key_point()?;
+            let x_point = self.group.verifying_key_point()?;
             return Ok((x_point, a, b, gamma));
         }
 
@@ -214,7 +213,7 @@ impl FrostPmCoordinator {
         self.aggregated_a = Some(aggregated_a);
         self.aggregated_b = Some(aggregated_b);
         self.aggregated_gamma = Some(aggregated_gamma);
-        let x_point = self.verifying_key_point()?;
+        let x_point = self.group.verifying_key_point()?;
         Ok((x_point, aggregated_a, aggregated_b, aggregated_gamma))
     }
 
