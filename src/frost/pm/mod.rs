@@ -7,9 +7,10 @@ pub mod signing_package;
 pub mod gamma_share;
 pub mod response_share;
 
-pub use coordinator::FrostPmCoordinator;
 pub use commitment::FrostPmCommitment;
+pub use coordinator::FrostPmCoordinator;
 pub use gamma_share::FrostPmGammaShare;
+pub use participant::FrostPmParticipant;
 pub use response_share::FrostPmResponseShare;
 pub use signing_package::FrostPmSigningPackage;
 pub use primitives::{

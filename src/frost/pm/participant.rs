@@ -1,28 +1,53 @@
-use bc_components::ARID;
+use bc_components::{ARID, XID};
 use k256::{ProjectivePoint, Scalar};
 use rand_core::OsRng;
 
 use crate::frost::{
     group::FrostGroup,
-    participant::FrostParticipant,
-    pm::{
-        commitment::FrostPmCommitment,
-        gamma_share::FrostPmGammaShare,
-        primitives::point_bytes,
-        response_share::{FrostPmResponseShare, response_share_scalar_from_bytes},
-        signing_package::FrostPmSigningPackage,
-    },
+    signing::participant::FrostSigningParticipant,
 };
 use crate::{Error, Result};
+use frost_secp256k1_tr as frost;
 
-impl FrostParticipant {
+use crate::frost::pm::{
+    commitment::FrostPmCommitment,
+    gamma_share::FrostPmGammaShare,
+    primitives::point_bytes,
+    response_share::{
+        FrostPmResponseShare, response_share_scalar_from_bytes,
+    },
+    signing_package::FrostPmSigningPackage,
+};
+
+#[derive(Clone)]
+pub struct FrostPmParticipant {
+    xid: XID,
+    key_package: frost::keys::KeyPackage,
+    session: Option<ARID>,
+    nonce: Option<Scalar>,
+    lambda_share: Option<Scalar>,
+}
+
+impl FrostPmParticipant {
+    pub fn new(xid: XID, key_package: frost::keys::KeyPackage) -> Self {
+        Self { xid, key_package, session: None, nonce: None, lambda_share: None }
+    }
+
+    pub fn from_signing(participant: &FrostSigningParticipant) -> Self {
+        Self::new(participant.xid(), participant.key_package().clone())
+    }
+
+    pub fn xid(&self) -> XID { self.xid }
+
+    fn key_package(&self) -> &frost::keys::KeyPackage { &self.key_package }
+
     /// Round-1: generate per-signer commitments A=k·G and B=k·H for the provided hash point H.
     pub fn pm_round1_commit(
         &mut self,
         session: ARID,
         h_point: &ProjectivePoint,
     ) -> Result<FrostPmCommitment> {
-        if let Some(existing) = self.pm_session {
+        if let Some(existing) = self.session {
             if existing != session {
                 return Err(Error::msg(
                     "participant active in different pm session",
@@ -35,12 +60,12 @@ impl FrostParticipant {
         let g_commitment = point_bytes(&(ProjectivePoint::GENERATOR * nonce))?;
         let h_commitment = point_bytes(&((*h_point) * nonce))?;
 
-        self.pm_session = Some(session);
-        self.pm_nonce = Some(nonce);
-        self.pm_lambda_share = None;
+        self.session = Some(session);
+        self.nonce = Some(nonce);
+        self.lambda_share = None;
 
         Ok(FrostPmCommitment {
-            xid: self.xid(),
+            xid: self.xid,
             session,
             g_commitment,
             h_commitment,
@@ -53,7 +78,7 @@ impl FrostParticipant {
         _group: &FrostGroup,
         package: &FrostPmSigningPackage,
     ) -> Result<FrostPmGammaShare> {
-        let session = self.pm_session.ok_or_else(|| {
+        let session = self.session.ok_or_else(|| {
             Error::msg("pm_round1_commit must be called first")
         })?;
         if package.session != session {
@@ -61,7 +86,7 @@ impl FrostParticipant {
         }
 
         let lambda = package
-            .lambda_for(&self.xid())
+            .lambda_for(&self.xid)
             .ok_or_else(|| Error::msg("missing lambda for participant"))?;
 
         let share_bytes = self.key_package().signing_share().serialize();
@@ -71,9 +96,9 @@ impl FrostParticipant {
         let gamma_point = package.h_point * lambda_share;
         let gamma_bytes = point_bytes(&gamma_point)?;
 
-        self.pm_lambda_share = Some(lambda_share);
+        self.lambda_share = Some(lambda_share);
 
-        Ok(FrostPmGammaShare { xid: self.xid(), session, gamma_bytes })
+        Ok(FrostPmGammaShare { xid: self.xid, session, gamma_bytes })
     }
 
     /// Round-2b: after receiving the challenge, emit the participant's partial `z` response.
@@ -81,22 +106,22 @@ impl FrostParticipant {
         &mut self,
         challenge: &Scalar,
     ) -> Result<FrostPmResponseShare> {
-        let session = self.pm_session.ok_or_else(|| {
+        let session = self.session.ok_or_else(|| {
             Error::msg("pm_round1_commit must be called first")
         })?;
-        let nonce = self.pm_nonce.ok_or_else(|| {
+        let nonce = self.nonce.ok_or_else(|| {
             Error::msg("pm_round2_emit_gamma must be called first")
         })?;
-        let lambda_share = self.pm_lambda_share.ok_or_else(|| {
+        let lambda_share = self.lambda_share.ok_or_else(|| {
             Error::msg("pm_round2_emit_gamma must be called first")
         })?;
 
         let z_share = nonce + (*challenge * lambda_share);
 
         // Clear state to avoid nonce reuse in future ceremonies.
-        self.pm_session = None;
-        self.pm_nonce = None;
-        self.pm_lambda_share = None;
-        Ok(FrostPmResponseShare::from_scalar(self.xid(), session, &z_share))
+        self.session = None;
+        self.nonce = None;
+        self.lambda_share = None;
+        Ok(FrostPmResponseShare::from_scalar(self.xid, session, &z_share))
     }
 }

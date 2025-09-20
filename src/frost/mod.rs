@@ -1,7 +1,6 @@
 mod aggregate;
 mod coordinator;
 mod group;
-mod participant;
 pub mod pm;
 mod signing;
 
@@ -10,8 +9,7 @@ pub use aggregate::{
 };
 pub use coordinator::FrostCoordinator;
 pub use group::FrostGroup;
-pub use participant::FrostParticipant;
 pub use signing::{
-    FrostSignatureShare, FrostSignatureShares, FrostSigningCommitment,
-    FrostSigningPackage, build_signing_package,
+    FrostSigningParticipant, FrostSignatureShare, FrostSignatureShares,
+    FrostSigningCommitment, FrostSigningPackage, build_signing_package,
 };

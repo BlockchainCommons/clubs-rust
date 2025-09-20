@@ -9,7 +9,7 @@ use k256::elliptic_curve::sec1::FromEncodedPoint;
 use k256::{AffinePoint, EncodedPoint, FieldBytes, ProjectivePoint, Scalar};
 use rand::rngs::OsRng; // ByteString
 
-use crate::frost::participant::FrostParticipant;
+use crate::frost::signing::participant::FrostSigningParticipant;
 
 // Internal public key package used by the group; not exposed outside this
 // module tree.
@@ -238,12 +238,12 @@ impl FrostGroup {
     }
 
     /// Create a FROST group with a trusted dealer and return signer contexts.
-    /// Returns the group and a map of XID -> FrostParticipant (each holding its
+    /// Returns the group and a map of XID -> FrostSigningParticipant (each holding its
     /// secret share).
     pub fn new_with_trusted_dealer(
         threshold: usize,
         members: Vec<XID>,
-    ) -> Result<(Self, BTreeMap<XID, FrostParticipant>)> {
+    ) -> Result<(Self, BTreeMap<XID, FrostSigningParticipant>)> {
         let max = members.len() as u16;
         let min = threshold as u16;
         // Assign Identifiers internally in order 1..=n
@@ -265,7 +265,8 @@ impl FrostGroup {
             )?;
 
         // Build participant contexts (each with its own secret share)
-        let mut participants: BTreeMap<XID, FrostParticipant> = BTreeMap::new();
+        let mut participants: BTreeMap<XID, FrostSigningParticipant> =
+            BTreeMap::new();
         // Reverse map Identifier -> XID
         let mut rev: BTreeMap<Identifier, XID> = BTreeMap::new();
         for (x, i) in &id_map {
@@ -276,7 +277,7 @@ impl FrostGroup {
             let xid = *rev
                 .get(id)
                 .ok_or_else(|| Error::msg("unknown identifier from dealer"))?;
-            participants.insert(xid, FrostParticipant::new(xid, kp));
+            participants.insert(xid, FrostSigningParticipant::new(xid, kp));
         }
 
         let pubkey_pkg =

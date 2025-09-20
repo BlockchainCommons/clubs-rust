@@ -3,8 +3,11 @@ use std::collections::BTreeMap;
 use bc_components::{PrivateKeyBase, XID, XIDProvider};
 use bc_xid::XIDDocument;
 use clubs::frost::{
-    FrostGroup, FrostParticipant,
-    pm::{DleqProof, FrostPmCoordinator, FrostProvenanceChain, key_from_gamma, point_bytes},
+    FrostGroup,
+    pm::{
+        DleqProof, FrostPmCoordinator, FrostPmParticipant, FrostProvenanceChain,
+        key_from_gamma, point_bytes,
+    },
 };
 use dcbor::Date;
 use provenance_mark::{ProvenanceMark, ProvenanceMarkResolution};
@@ -25,7 +28,7 @@ fn collect_marks(advances: &[Advance]) -> Vec<ProvenanceMark> {
 fn run_ceremony(
     chain: &mut FrostProvenanceChain,
     coordinator: &mut FrostPmCoordinator,
-    participants: &mut BTreeMap<XID, FrostParticipant>,
+    participants: &mut BTreeMap<XID, FrostPmParticipant>,
     roster: &[XID],
     date: Date,
 ) -> clubs::Result<Advance> {
@@ -95,8 +98,16 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
         XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
 
     let members = vec![alice_doc.xid(), bob_doc.xid(), charlie_doc.xid()];
-    let (group, mut participants): (FrostGroup, BTreeMap<_, _>) =
+    let (group, signing_participants): (
+        FrostGroup,
+        BTreeMap<XID, clubs::frost::FrostSigningParticipant>,
+    ) =
         FrostGroup::new_with_trusted_dealer(2, members.clone())?;
+
+    let mut participants: BTreeMap<XID, FrostPmParticipant> = signing_participants
+        .iter()
+        .map(|(xid, signer)| (*xid, FrostPmParticipant::from_signing(signer)))
+        .collect();
 
     let genesis = iso_date("2025-01-01");
     let mut publishing_chain = FrostProvenanceChain::new(

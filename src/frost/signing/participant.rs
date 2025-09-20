@@ -6,10 +6,9 @@ use frost_secp256k1_tr::{
     self as frost, Identifier,
     round1::{NonceCommitment, SigningCommitments},
 };
-use k256::Scalar;
 use rand::rngs::OsRng;
 
-use super::{
+use crate::frost::{
     group::FrostGroup,
     signing::{
         FrostSignatureShare, FrostSigningCommitment, FrostSigningPackage,
@@ -17,32 +16,20 @@ use super::{
 };
 
 #[derive(Clone)]
-pub struct FrostParticipant {
+pub struct FrostSigningParticipant {
     xid: XID,
     key_package: frost::keys::KeyPackage,
     nonces: Option<frost::round1::SigningNonces>,
-    pub(super) pm_session: Option<ARID>,
-    pub(super) pm_nonce: Option<Scalar>,
-    pub(super) pm_lambda_share: Option<Scalar>,
 }
 
-impl FrostParticipant {
+impl FrostSigningParticipant {
     pub fn new(xid: XID, key_package: frost::keys::KeyPackage) -> Self {
-        Self {
-            xid,
-            key_package,
-            nonces: None,
-            pm_session: None,
-            pm_nonce: None,
-            pm_lambda_share: None,
-        }
+        Self { xid, key_package, nonces: None }
     }
 
-    pub fn xid(&self) -> XID {
-        self.xid
-    }
+    pub fn xid(&self) -> XID { self.xid }
 
-    pub(super) fn key_package(&self) -> &frost::keys::KeyPackage {
+    pub(crate) fn key_package(&self) -> &frost::keys::KeyPackage {
         &self.key_package
     }
 
@@ -85,9 +72,7 @@ impl FrostParticipant {
             let hiding = NonceCommitment::deserialize(comm.hiding.as_ref())
                 .map_err(|e| Error::msg(format!("deserialize hiding: {e}")))?;
             let binding = NonceCommitment::deserialize(comm.binding.as_ref())
-                .map_err(|e| {
-                Error::msg(format!("deserialize binding: {e}"))
-            })?;
+                .map_err(|e| Error::msg(format!("deserialize binding: {e}")))?;
             frost_commitments
                 .insert(id, SigningCommitments::new(hiding, binding));
         }
@@ -99,8 +84,8 @@ impl FrostParticipant {
 
         let share = frost::round2::sign(&frost_sp, nonces, &self.key_package)
             .map_err(|e| {
-            Error::msg(format!("round2 sign failed for {}: {e}", self.xid))
-        })?;
+                Error::msg(format!("round2 sign failed for {}: {e}", self.xid))
+            })?;
         Ok(FrostSignatureShare {
             xid: self.xid,
             session: signing_pkg.session,
