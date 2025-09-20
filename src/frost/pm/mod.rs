@@ -1,13 +1,16 @@
 mod coordinator;
 mod participant;
 pub mod primitives;
-mod state;
+pub mod state;
+pub mod signing_package;
+pub mod gamma_share;
+pub mod response_share;
 
 pub use coordinator::FrostPmCoordinator;
-pub use participant::{
-    FrostPmCommitment, FrostPmGammaShare, FrostPmResponseShare,
-    FrostPmSigningPackage,
-};
+pub use participant::FrostPmCommitment;
+pub use gamma_share::FrostPmGammaShare;
+pub use response_share::FrostPmResponseShare;
+pub use signing_package::FrostPmSigningPackage;
 pub use primitives::{
     DleqProof, FrostPmError, Result as FrostPmResult, dleq_challenge,
     expand_mark_key, hash_to_curve, key_from_gamma, normalize_secret_to_pubkey,

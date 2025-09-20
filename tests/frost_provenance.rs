@@ -142,7 +142,7 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
         )?;
 
         verifier_chain.verify_advance(&advance.mark, &advance.gamma_bytes, &advance.proof)?;
-        advances.push(advance.clone());
+        advances.push(advance);
 
         eprintln!("{}", blurb);
     }
