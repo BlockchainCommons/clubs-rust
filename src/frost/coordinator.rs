@@ -21,8 +21,8 @@ pub struct FrostCoordinator {
     group: FrostGroup,
     message: Option<Envelope>,
     // Track per-member commitments and shares for idempotency and conflict detection
-    commitments: BTreeMap<bc_components::XID, FrostSigningCommitment>,
-    shares: BTreeMap<bc_components::XID, FrostSignatureShare>,
+    commitments: BTreeMap<XID, FrostSigningCommitment>,
+    shares: BTreeMap<XID, FrostSignatureShare>,
     // The signing package prepared for this ceremony (selected roster)
     package: Option<FrostSigningPackage>,
     // Session identifier for this ceremony

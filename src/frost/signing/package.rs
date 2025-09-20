@@ -71,17 +71,18 @@ impl TryFrom<Envelope> for FrostSigningPackage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bc_components::XID;
     use indoc::indoc;
 
     #[test]
     fn frost_signing_package_roundtrip_text() {
-        let xid1 = bc_components::XID::from_hex(
+        let xid1 = XID::from_hex(
             "1111111111111111111111111111111111111111111111111111111111111111",
         );
-        let xid2 = bc_components::XID::from_hex(
+        let xid2 = XID::from_hex(
             "2222222222222222222222222222222222222222222222222222222222222222",
         );
-        let session = bc_components::ARID::from_hex(
+        let session = ARID::from_hex(
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         );
         let c1 = FrostSigningCommitment::new(xid1, session, [1; 33], [2; 33])
@@ -119,7 +120,6 @@ mod tests {
         "#}).trim();
         assert_eq!(env.format(), expected);
         let rt = FrostSigningPackage::try_from(env).unwrap();
-        use bc_components::DigestProvider;
         assert_eq!(
             pkg.message.subject().digest(),
             rt.message.subject().digest()

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::{Error, Result};
-use bc_components::{SigningPublicKey, XID};
+use bc_components::{SchnorrPublicKey, SigningPublicKey, XID};
 use dcbor::prelude::*;
 use frost_secp256k1_tr::{self as frost, Identifier};
 use k256::elliptic_curve::PrimeField;
@@ -25,7 +25,7 @@ impl FrostPublicKeyPackage {
         debug_assert_eq!(sec1.len(), 33);
         let mut xonly = [0u8; 32];
         xonly.copy_from_slice(&sec1[1..]);
-        let schnorr_pk = bc_components::SchnorrPublicKey::from_data(xonly);
+        let schnorr_pk = SchnorrPublicKey::from_data(xonly);
         SigningPublicKey::from_schnorr(schnorr_pk)
     }
 
@@ -136,7 +136,7 @@ impl FrostGroup {
                 let mut xonly = [0u8; 32];
                 xonly.copy_from_slice(&sec1[1..]);
                 let schnorr_pk =
-                    bc_components::SchnorrPublicKey::from_data(xonly);
+                    SchnorrPublicKey::from_data(xonly);
                 participant_keys
                     .insert(*xid, SigningPublicKey::from_schnorr(schnorr_pk));
             }

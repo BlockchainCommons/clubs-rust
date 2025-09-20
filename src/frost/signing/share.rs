@@ -48,10 +48,10 @@ mod tests {
 
     #[test]
     fn frost_signature_share_roundtrip_text() {
-        let xid = bc_components::XID::from_hex(
+        let xid = XID::from_hex(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         );
-        let session = bc_components::ARID::from_hex(
+        let session = ARID::from_hex(
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         );
         let share =

@@ -14,4 +14,4 @@ pub use primitives::{
     pm_message, point_bytes, point_from_bytes, ratchet_state,
     vrf_gamma_and_proof_for_x, vrf_verify_for_x,
 };
-pub use state::{FrostProvenanceAdvance, FrostProvenanceChain};
+pub use state::FrostProvenanceChain;

@@ -17,7 +17,8 @@
 use crate::public_key_permit::PublicKeyPermit;
 use crate::{Error, Result};
 use bc_components::{
-    Digest, DigestProvider, SSKRSpec, Signature, SymmetricKey, XID,
+    Digest, DigestProvider, SSKRSpec, SealedMessage, Signature, Signer,
+    SymmetricKey, XID,
 };
 use bc_envelope::prelude::*;
 use known_values::{
@@ -111,8 +112,8 @@ impl Edition {
         &self,
         recipients: &[PublicKeyPermit],
         sskr_spec: Option<SSKRSpec>,
-        signer: &dyn bc_components::Signer,
-        signing_options: Option<bc_components::SigningOptions>,
+        signer: &dyn Signer,
+        signing_options: Option<SigningOptions>,
     ) -> Result<(Envelope, Option<Vec<Vec<Envelope>>>)> {
         // Fresh content key per edition.
         let content_key = SymmetricKey::new();
@@ -135,7 +136,7 @@ impl Edition {
             for pkp in recipients {
                 match pkp {
                     PublicKeyPermit::Encode { recipient, member_xid } => {
-                        let sealed = bc_components::SealedMessage::new_with_aad(
+                        let sealed = SealedMessage::new_with_aad(
                             content_key.to_cbor_data(),
                             recipient,
                             Some(edition_id_aad.as_slice()),
@@ -224,7 +225,7 @@ impl TryFrom<Envelope> for Edition {
                     // XID.
                     if !obj.is_obscured() {
                         let sealed = obj
-                            .extract_subject::<bc_components::SealedMessage>(
+                            .extract_subject::<SealedMessage>(
                             )?;
                         // Find optional holder assertion(s) on the permit
                         // assertion envelope.

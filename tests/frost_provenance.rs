@@ -1,26 +1,172 @@
 use std::collections::BTreeMap;
 
-use bc_components::{PrivateKeyBase, XIDProvider};
+use bc_components::{PrivateKeyBase, XIDProvider, XID};
 use bc_xid::XIDDocument;
 use clubs::frost::{
-    FrostGroup,
-    pm::{FrostPmCoordinator, FrostProvenanceAdvance, FrostProvenanceChain},
+    FrostGroup, FrostParticipant,
+    pm::{
+        DleqProof, FrostPmCoordinator, FrostProvenanceChain, expand_mark_key,
+        hash_to_curve, key_from_gamma, pm_message, point_bytes, ratchet_state,
+    },
 };
 use dcbor::Date;
-use provenance_mark::ProvenanceMark;
-use provenance_mark::ProvenanceMarkResolution;
+use k256::ProjectivePoint;
+use provenance_mark::{ProvenanceMark, ProvenanceMarkResolution};
+use sha2::{Digest, Sha256};
+
+#[derive(Clone)]
+struct Advance {
+    mark: ProvenanceMark,
+    gamma_bytes: [u8; 33],
+    proof: DleqProof,
+}
+
+struct PublishingState {
+    resolution: ProvenanceMarkResolution,
+    chain_id: Vec<u8>,
+    current_key: Vec<u8>,
+    ratchet_state: [u8; 32],
+    sequence: u32,
+    last_date: Date,
+    group: FrostGroup,
+    group_point: ProjectivePoint,
+}
+
+impl PublishingState {
+    fn new(
+        group: &FrostGroup,
+        resolution: ProvenanceMarkResolution,
+        label: &[u8],
+        genesis_date: Date,
+    ) -> clubs::Result<Self> {
+        let group_point = group.verifying_key_point()?;
+        let chain_id = derive_chain_id(resolution, &group_point, label)?;
+        let ratchet_state = genesis_state();
+        Ok(Self {
+            resolution,
+            chain_id: chain_id.clone(),
+            current_key: chain_id,
+            ratchet_state,
+            sequence: 0,
+            last_date: genesis_date,
+            group: group.clone(),
+            group_point,
+        })
+    }
+
+    fn run_ceremony(
+        &mut self,
+        coordinator: &mut FrostPmCoordinator,
+        participants: &mut BTreeMap<XID, FrostParticipant>,
+        roster: &[XID],
+        date: Date,
+    ) -> clubs::Result<Advance> {
+        if date < self.last_date {
+            return Err(clubs::Error::msg(
+                "provenance date must be non-decreasing",
+            ));
+        }
+
+        let next_step = (self.sequence as u64) + 1;
+        let message = pm_message(
+            &self.group_point,
+            &self.chain_id,
+            &self.ratchet_state,
+            next_step,
+        )?;
+        let h_point = hash_to_curve(&message)?;
+
+        coordinator.start_session();
+        let session = coordinator.session_id();
+
+        for xid in roster {
+            let signer = participants.get_mut(xid).ok_or_else(|| {
+                clubs::Error::msg(format!("unknown participant: {}", xid))
+            })?;
+            let commitment = signer.pm_round1_commit(session, &h_point)?;
+            coordinator.add_commitment(commitment)?;
+        }
+
+        let signing_package =
+            coordinator.signing_package_for(roster, &h_point)?;
+        for xid in roster {
+            let signer = participants.get_mut(xid).ok_or_else(|| {
+                clubs::Error::msg(format!("unknown participant: {}", xid))
+            })?;
+            let gamma_share =
+                signer.pm_round2_emit_gamma(&self.group, &signing_package)?;
+            coordinator.record_gamma_share(gamma_share)?;
+        }
+
+        let challenge = coordinator.challenge()?;
+        for xid in roster {
+            let signer = participants.get_mut(xid).ok_or_else(|| {
+                clubs::Error::msg(format!("unknown participant: {}", xid))
+            })?;
+            let response = signer.pm_finalize_response(&challenge)?;
+            coordinator.record_response(response)?;
+        }
+
+        let (gamma_point, proof) = coordinator.finalize()?;
+        let gamma_bytes = point_bytes(&gamma_point)?;
+        let full_key = key_from_gamma(&gamma_point)?;
+        let link_len = self.resolution.link_length();
+        let mut next_key = vec![0u8; link_len];
+        next_key.copy_from_slice(&full_key[..link_len]);
+
+        let mark = ProvenanceMark::new(
+            self.resolution,
+            self.current_key.clone(),
+            next_key.clone(),
+            self.chain_id.clone(),
+            self.sequence,
+            date.clone(),
+            Option::<dcbor::CBOR>::None,
+        )?;
+
+        let expanded_key = expand_mark_key(&next_key);
+        self.ratchet_state = ratchet_state(&self.ratchet_state, &expanded_key);
+        self.current_key = next_key;
+        self.sequence += 1;
+        self.last_date = date;
+
+        Ok(Advance { mark, gamma_bytes, proof })
+    }
+}
+
+fn genesis_state() -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"PM-Genesis");
+    let digest = hasher.finalize();
+    let mut state = [0u8; 32];
+    state.copy_from_slice(&digest);
+    state
+}
+
+fn derive_chain_id(
+    resolution: ProvenanceMarkResolution,
+    group_point: &ProjectivePoint,
+    label: &[u8],
+) -> clubs::Result<Vec<u8>> {
+    let x_bytes = point_bytes(group_point)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"PM-CHAIN-ID");
+    hasher.update(x_bytes);
+    hasher.update(label);
+    let digest = hasher.finalize();
+    Ok(digest[..resolution.link_length()].to_vec())
+}
 
 fn iso_date(date: &str) -> Date {
     Date::from_string(date).expect("valid ISO-8601 date")
 }
 
-fn collect_marks(advances: &[FrostProvenanceAdvance]) -> Vec<ProvenanceMark> {
+fn collect_marks(advances: &[Advance]) -> Vec<ProvenanceMark> {
     advances.iter().map(|a| a.mark.clone()).collect()
 }
 
 #[test]
 fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
-    // Alice launches the club with Bob and Charlie as co-organizers.
     let alice_doc =
         XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
     let bob_doc = XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
@@ -31,9 +177,8 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
     let (group, mut participants): (FrostGroup, BTreeMap<_, _>) =
         FrostGroup::new_with_trusted_dealer(2, members.clone())?;
 
-    // The club agrees to ratchet the provenance mark chain at quartile resolution.
     let genesis = iso_date("2025-01-01");
-    let mut publishing_chain = FrostProvenanceChain::new(
+    let mut publishing_state = PublishingState::new(
         &group,
         ProvenanceMarkResolution::Quartile,
         b"Gordian Club Minutes",
@@ -47,7 +192,6 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
     )?;
     let mut coordinator = FrostPmCoordinator::new(group.clone());
 
-    // Story beats: a different roster carries the chain forward each time.
     let publishing_plan: Vec<(&str, Vec<_>, Date)> = vec![
         (
             "Founding minutes signed by Alice and Bob",
@@ -66,25 +210,17 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
         ),
     ];
 
-    let mut advances: Vec<FrostProvenanceAdvance> = Vec::new();
+    let mut advances: Vec<Advance> = Vec::new();
     for (blurb, roster, date) in publishing_plan {
-        let advance = publishing_chain.advance(
-            &mut coordinator,
-            &mut participants,
-            &roster,
-            date,
-        )?;
+        let Advance { mark, gamma_bytes, proof } = publishing_state
+            .run_ceremony(&mut coordinator, &mut participants, &roster, date)?;
 
-        // Everyone who only observes the chain can verify the step without
-        // touching any secret material.
-        verifier_chain.verify_advance(&advance)?;
-        advances.push(advance);
+        verifier_chain.verify_advance(&mark, &gamma_bytes, &proof)?;
+        advances.push(Advance { mark, gamma_bytes, proof });
 
-        // Tuck the narrative into the test output for future debugging.
         eprintln!("{}", blurb);
     }
 
-    // Validate the resulting marks with the provenance-mark crate helpers.
     let marks = collect_marks(&advances);
     assert!(ProvenanceMark::is_sequence_valid(&marks));
     for window in marks.windows(2) {
@@ -93,8 +229,7 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
         assert!(current.precedes(next));
     }
 
-    // The chain id remains stable regardless of which quorum advanced it.
-    let chain_id = publishing_chain.chain_id().to_vec();
+    let chain_id = verifier_chain.chain_id().to_vec();
     for advance in &advances {
         assert_eq!(advance.mark.chain_id(), chain_id);
     }

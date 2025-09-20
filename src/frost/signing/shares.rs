@@ -67,17 +67,18 @@ impl TryFrom<Envelope> for FrostSignatureShares {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bc_components::XID;
     use indoc::indoc;
 
     #[test]
     fn frost_signature_shares_roundtrip_text() {
-        let xid1 = bc_components::XID::from_hex(
+        let xid1 = XID::from_hex(
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         );
-        let xid2 = bc_components::XID::from_hex(
+        let xid2 = XID::from_hex(
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         );
-        let session = bc_components::ARID::from_hex(
+        let session = ARID::from_hex(
             "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         );
         let s1 =
