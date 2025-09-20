@@ -19,7 +19,7 @@ use crate::{Error, Result};
 /// message `Envelope`, constructs the signing package, collects Round-2
 /// signature shares, then aggregates the final signature and returns the
 /// signed `Envelope`.
-pub struct FrostCoordinator {
+pub struct FrostSigningCoordinator {
     group: FrostGroup,
     message: Option<Envelope>,
     // Track per-member commitments and shares for idempotency and conflict
@@ -34,7 +34,7 @@ pub struct FrostCoordinator {
     consent: BTreeSet<XID>,
 }
 
-impl FrostCoordinator {
+impl FrostSigningCoordinator {
     pub fn new(group: FrostGroup) -> Self {
         Self {
             group,

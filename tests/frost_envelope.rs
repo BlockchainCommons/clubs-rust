@@ -1,7 +1,9 @@
 use bc_components::XIDProvider;
 use bc_envelope::{PrivateKeyBase, prelude::*};
 use bc_xid::XIDDocument;
-use clubs::frost::{FrostCoordinator, FrostGroup, FrostSigningParticipant};
+use clubs::frost::{
+    FrostGroup, FrostSigningCoordinator, FrostSigningParticipant,
+};
 use indoc::indoc;
 
 #[test]
@@ -37,7 +39,7 @@ fn frost_two_of_three_signs_envelope_and_verify() {
         participants.remove(&charlie_doc.xid()).unwrap();
 
     // Coordinator orchestrates the ceremony as a neutral message hub
-    let mut coordinator = FrostCoordinator::new(group.clone());
+    let mut coordinator = FrostSigningCoordinator::new(group.clone());
     coordinator.set_message(message);
     let session_id = coordinator.session_id();
 

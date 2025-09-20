@@ -8,7 +8,7 @@ mod signing;
 pub use aggregate::{
     aggregate_and_attach_signature, attach_preaggregated_signature,
 };
-pub use coordinator::FrostCoordinator;
+pub use coordinator::FrostSigningCoordinator;
 pub use group::FrostGroup;
 pub use participant_core::FrostParticipantCore;
 pub use signing::{
