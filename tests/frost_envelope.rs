@@ -2,6 +2,7 @@ use bc_components::XIDProvider;
 use bc_envelope::{PrivateKeyBase, prelude::*};
 use bc_xid::XIDDocument;
 use clubs::frost::{FrostCoordinator, FrostGroup};
+use indoc::indoc;
 
 #[test]
 fn frost_two_of_three_signs_envelope_and_verify() {
@@ -12,10 +13,10 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     let charlie_doc =
         XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
 
-    // --- Prepare an Envelope, wrapped it so the signature covers the whole
+    // --- Prepare an Envelope, wrapped so the signature covers the whole
     // structure ---
     let message = Envelope::new("FROST demo")
-        .add_assertion("note", "This is an assertion on the subject.")
+        .add_assertion(known_values::NOTE, "This is an assertion on the subject.")
         .wrap();
     // --- Build FrostGroup of all participants using Trusted Dealer ---
     let members = vec![alice_doc.xid(), bob_doc.xid(), charlie_doc.xid()];
@@ -69,6 +70,19 @@ fn frost_two_of_three_signs_envelope_and_verify() {
 
     // Coordinator aggregates shares and attaches the final signature to the message
     let signed_envelope = coordinator.finalize().unwrap();
+
+    #[rustfmt::skip]
+    let expected = (indoc! {r#"
+        {
+            "FROST demo" [
+                'note': "This is an assertion on the subject."
+            ]
+        } [
+            'signed': Signature
+        ]
+    "#}).trim();
+    assert_eq!(signed_envelope.format(), expected);
+
     let signing_key = group.verifying_signing_key();
     signed_envelope.verify_signature_from(&signing_key).unwrap();
 }

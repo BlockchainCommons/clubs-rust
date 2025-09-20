@@ -25,6 +25,7 @@ pub fn build_signing_package(
 impl From<FrostSigningPackage> for Envelope {
     fn from(value: FrostSigningPackage) -> Self {
         let mut e = Envelope::new(known_values::UNIT);
+        e = e.add_type("FrostSigningPackage");
         e = e.add_assertion("session", value.session);
         e = e.add_assertion("message", value.message.clone());
         for c in value.commitments {
@@ -39,6 +40,7 @@ impl From<FrostSigningPackage> for Envelope {
 impl TryFrom<Envelope> for FrostSigningPackage {
     type Error = anyhow::Error;
     fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
+        envelope.check_type_envelope("FrostSigningPackage")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
@@ -94,13 +96,16 @@ mod tests {
         #[rustfmt::skip]
         let expected = (indoc! {r#"
             '' [
+                'isA': "FrostSigningPackage"
                 "commitment": '' [
+                    'isA': "FrostSigningCommitment"
                     "binding": Bytes(33)
                     "hiding": Bytes(33)
                     "session": ARID(bbbbbbbb)
                     'holder': XID(11111111)
                 ]
                 "commitment": '' [
+                    'isA': "FrostSigningCommitment"
                     "binding": Bytes(33)
                     "hiding": Bytes(33)
                     "session": ARID(bbbbbbbb)

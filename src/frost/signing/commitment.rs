@@ -37,6 +37,7 @@ impl FrostSigningCommitment {
 impl From<FrostSigningCommitment> for Envelope {
     fn from(value: FrostSigningCommitment) -> Self {
         let mut e = Envelope::new(known_values::UNIT);
+        e = e.add_type("FrostSigningCommitment");
         e = e.add_assertion(HOLDER, value.xid);
         e = e.add_assertion("session", value.session);
         e = e.add_assertion("hiding", CBOR::from(value.hiding));
@@ -48,6 +49,7 @@ impl From<FrostSigningCommitment> for Envelope {
 impl TryFrom<Envelope> for FrostSigningCommitment {
     type Error = anyhow::Error;
     fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
+        envelope.check_type_envelope("FrostSigningCommitment")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
@@ -88,6 +90,7 @@ mod tests {
         #[rustfmt::skip]
         let expected = (indoc! {r#"
             '' [
+                'isA': "FrostSigningCommitment"
                 "binding": Bytes(33)
                 "hiding": Bytes(33)
                 "session": ARID(aaaaaaaa)

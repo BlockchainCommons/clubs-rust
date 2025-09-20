@@ -1,6 +1,5 @@
 use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
-use known_values::HOLDER;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrostSignatureShare {
@@ -12,7 +11,8 @@ pub struct FrostSignatureShare {
 impl From<FrostSignatureShare> for Envelope {
     fn from(value: FrostSignatureShare) -> Self {
         let mut e = Envelope::new(known_values::UNIT);
-        e = e.add_assertion(HOLDER, value.xid);
+        e = e.add_type("FrostSignatureShare");
+        e = e.add_assertion(known_values::HOLDER, value.xid);
         e = e.add_assertion("session", value.session);
         e = e.add_assertion("share", CBOR::to_byte_string(value.share.clone()));
         e
@@ -22,12 +22,13 @@ impl From<FrostSignatureShare> for Envelope {
 impl TryFrom<Envelope> for FrostSignatureShare {
     type Error = anyhow::Error;
     fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
+        envelope.check_type_envelope("FrostSignatureShare")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
             anyhow::bail!("unexpected subject for FrostSignatureShare");
         }
-        let xid: XID = envelope.try_object_for_predicate(HOLDER)?;
+        let xid: XID = envelope.try_object_for_predicate(known_values::HOLDER)?;
         let session: ARID = envelope.try_object_for_predicate("session")?;
         let share_bs: ByteString =
             envelope.try_object_for_predicate("share")?;
@@ -55,6 +56,7 @@ mod tests {
         #[rustfmt::skip]
         let expected = (indoc! {r#"
             '' [
+                'isA': "FrostSignatureShare"
                 "session": ARID(cccccccc)
                 "share": Bytes(3)
                 'holder': XID(aaaaaaaa)

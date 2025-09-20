@@ -18,6 +18,7 @@ impl FrostSignatureShares {
 impl From<FrostSignatureShares> for Envelope {
     fn from(value: FrostSignatureShares) -> Self {
         let mut e = Envelope::new(known_values::UNIT);
+        e = e.add_type("FrostSignatureShares");
         e = e.add_assertion("session", value.session);
         for s in value.shares {
             let se: Envelope = s.into();
@@ -31,6 +32,7 @@ impl From<FrostSignatureShares> for Envelope {
 impl TryFrom<Envelope> for FrostSignatureShares {
     type Error = anyhow::Error;
     fn try_from(envelope: Envelope) -> anyhow::Result<Self> {
+        envelope.check_type_envelope("FrostSignatureShares")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
@@ -86,13 +88,16 @@ mod tests {
         #[rustfmt::skip]
         let expected = (indoc! {r#"
             '' [
+                'isA': "FrostSignatureShares"
                 "session": ARID(dddddddd)
                 "share": '' [
+                    'isA': "FrostSignatureShare"
                     "session": ARID(dddddddd)
                     "share": Bytes(2)
                     'holder': XID(bbbbbbbb)
                 ]
                 "share": '' [
+                    'isA': "FrostSignatureShare"
                     "session": ARID(dddddddd)
                     "share": Bytes(2)
                     'holder': XID(cccccccc)

@@ -4,7 +4,10 @@ use bc_components::{
 };
 use bc_envelope::prelude::*;
 use bc_xid::XIDDocument;
-use clubs::edition::{Edition, PublicKeyPermit, permit};
+use clubs::{
+    edition::Edition,
+    public_key_permit::PublicKeyPermit,
+};
 use indoc::indoc;
 use known_values::{CONTENT, NAME};
 use provenance_mark::{ProvenanceMarkGenerator, ProvenanceMarkResolution};
@@ -46,9 +49,9 @@ fn basic_scenario_alice_bob_charlie() {
     // Edition 1: sealed to all three, signed by the club.
     let edition = Edition::new(club.xid(), provenance, content.clone());
     let recipients: Vec<PublicKeyPermit> = vec![
-        permit::for_member(alice.xid(), &alice_k.public_keys()),
-        permit::for_member(bob.xid(), &bob_k.public_keys()),
-        permit::for_member(charlie.xid(), &charlie_k.public_keys()),
+        PublicKeyPermit::for_member(alice.xid(), &alice_k.public_keys()),
+        PublicKeyPermit::for_member(bob.xid(), &bob_k.public_keys()),
+        PublicKeyPermit::for_member(charlie.xid(), &charlie_k.public_keys()),
     ];
     // Combine permits: recipients and SSKR 2-of-3 group
     let group = SSKRGroupSpec::new(2, 3).unwrap();
@@ -67,6 +70,7 @@ fn basic_scenario_alice_bob_charlie() {
     #[rustfmt::skip]
     let expected = (indoc! {r#"
         XID(02dca4b9) [
+            'isA': "Edition"
             {
                 'hasRecipient': SealedMessage
             } [
@@ -96,6 +100,7 @@ fn basic_scenario_alice_bob_charlie() {
     #[rustfmt::skip]
     let expected_rt = (indoc! {r#"
         XID(02dca4b9) [
+            'isA': "Edition"
             {
                 'hasRecipient': SealedMessage
             } [
