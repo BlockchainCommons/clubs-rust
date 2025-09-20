@@ -14,7 +14,13 @@ pub fn build_signing_package(
     session: &ARID,
     envelope: &Envelope,
     commitments: Vec<FrostSigningCommitment>,
-) -> FrostSigningPackage { FrostSigningPackage { session: *session, message: envelope.clone(), commitments } }
+) -> FrostSigningPackage {
+    FrostSigningPackage {
+        session: *session,
+        message: envelope.clone(),
+        commitments,
+    }
+}
 
 impl From<FrostSigningPackage> for Envelope {
     fn from(value: FrostSigningPackage) -> Self {
@@ -44,7 +50,8 @@ impl TryFrom<Envelope> for FrostSigningPackage {
         for assertion in envelope.assertions() {
             let pred_env = assertion.try_predicate()?;
             if let Ok(pred) = pred_env.try_leaf() {
-                if let Ok(name) = <String as TryFrom<_>>::try_from(pred.clone()) {
+                if let Ok(name) = <String as TryFrom<_>>::try_from(pred.clone())
+                {
                     if name == "commitment" {
                         let obj_env = assertion.try_object()?;
                         let c = FrostSigningCommitment::try_from(obj_env)?;
@@ -73,10 +80,16 @@ mod tests {
         let session = bc_components::ARID::from_hex(
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         );
-        let c1 = FrostSigningCommitment::new(xid1, session, [1; 33], [2; 33]).unwrap();
-        let c2 = FrostSigningCommitment::new(xid2, session, [3; 33], [4; 33]).unwrap();
+        let c1 = FrostSigningCommitment::new(xid1, session, [1; 33], [2; 33])
+            .unwrap();
+        let c2 = FrostSigningCommitment::new(xid2, session, [3; 33], [4; 33])
+            .unwrap();
         let msg = Envelope::new("MSG");
-        let pkg = FrostSigningPackage { session, message: msg.clone(), commitments: vec![c1.clone(), c2.clone()] };
+        let pkg = FrostSigningPackage {
+            session,
+            message: msg.clone(),
+            commitments: vec![c1.clone(), c2.clone()],
+        };
         let env: Envelope = pkg.clone().into();
         #[rustfmt::skip]
         let expected = (indoc! {r#"
@@ -100,7 +113,10 @@ mod tests {
         assert_eq!(env.format(), expected);
         let rt = FrostSigningPackage::try_from(env).unwrap();
         use bc_components::DigestProvider;
-        assert_eq!(pkg.message.subject().digest(), rt.message.subject().digest());
+        assert_eq!(
+            pkg.message.subject().digest(),
+            rt.message.subject().digest()
+        );
         assert_eq!(pkg.session, rt.session);
         let mut a = pkg.commitments.clone();
         let mut b = rt.commitments.clone();

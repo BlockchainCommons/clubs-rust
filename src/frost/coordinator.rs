@@ -1,14 +1,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
-use bc_components::{XID, ARID};
 
 use super::aggregate::aggregate_and_attach_signature;
 use super::group::FrostGroup;
 use super::signing::{
-    build_signing_package, FrostSignatureShare, FrostSignatureShares,
-    FrostSigningCommitment, FrostSigningPackage,
+    FrostSignatureShare, FrostSignatureShares, FrostSigningCommitment,
+    FrostSigningPackage, build_signing_package,
 };
 
 /// A neutral coordinator for a FROST signing ceremony.
@@ -44,12 +44,20 @@ impl FrostCoordinator {
         }
     }
 
-    pub fn group(&self) -> &FrostGroup { &self.group }
-    pub fn session_id(&self) -> ARID { self.session_id }
-    pub fn set_session_id(&mut self, session_id: ARID) { self.session_id = session_id; }
+    pub fn group(&self) -> &FrostGroup {
+        &self.group
+    }
+    pub fn session_id(&self) -> ARID {
+        self.session_id
+    }
+    pub fn set_session_id(&mut self, session_id: ARID) {
+        self.session_id = session_id;
+    }
 
     /// Set or replace the message to be signed (typically a wrapped Envelope).
-    pub fn set_message(&mut self, message: Envelope) { self.message = Some(message); }
+    pub fn set_message(&mut self, message: Envelope) {
+        self.message = Some(message);
+    }
 
     /// Add a Round-1 commitment from a participant.
     pub fn add_commitment(&mut self, c: FrostSigningCommitment) -> Result<()> {
@@ -58,7 +66,10 @@ impl FrostCoordinator {
             return Err(anyhow!("commitment from non-member: {}", c.xid));
         }
         if c.session != self.session_id {
-            return Err(anyhow!("commitment has wrong session for member {}", c.xid));
+            return Err(anyhow!(
+                "commitment has wrong session for member {}",
+                c.xid
+            ));
         }
         match self.commitments.get(&c.xid) {
             None => {
@@ -96,7 +107,10 @@ impl FrostCoordinator {
     /// Build the signing package using only the specified roster of members.
     /// This allows collecting commitments from all members, while selecting a
     /// subset (>= threshold) for this ceremony. Stores the package for finalize().
-    pub fn signing_package_for(&mut self, roster: &[XID]) -> Result<FrostSigningPackage> {
+    pub fn signing_package_for(
+        &mut self,
+        roster: &[XID],
+    ) -> Result<FrostSigningPackage> {
         if roster.len() < self.group.threshold {
             return Err(anyhow!(
                 "roster smaller than threshold: {}/{}",
@@ -108,15 +122,18 @@ impl FrostCoordinator {
             .message
             .as_ref()
             .ok_or_else(|| anyhow!("message not set in coordinator"))?;
-        let mut selected: Vec<FrostSigningCommitment> = Vec::with_capacity(roster.len());
+        let mut selected: Vec<FrostSigningCommitment> =
+            Vec::with_capacity(roster.len());
         for xid in roster {
             if !self.consent.contains(xid) {
-                return Err(anyhow!("roster includes non-consenting member {}", xid));
+                return Err(anyhow!(
+                    "roster includes non-consenting member {}",
+                    xid
+                ));
             }
-            let c = self
-                .commitments
-                .get(xid)
-                .ok_or_else(|| anyhow!("missing commitment for member {}", xid))?;
+            let c = self.commitments.get(xid).ok_or_else(|| {
+                anyhow!("missing commitment for member {}", xid)
+            })?;
             selected.push(c.clone());
         }
         let pkg = build_signing_package(&self.session_id, msg, selected);
@@ -125,7 +142,9 @@ impl FrostCoordinator {
     }
 
     /// Build a signing package using all consenting members (who also provided commitments).
-    pub fn signing_package_from_consent(&mut self) -> Result<FrostSigningPackage> {
+    pub fn signing_package_from_consent(
+        &mut self,
+    ) -> Result<FrostSigningPackage> {
         if self.consent.len() < self.group.threshold {
             return Err(anyhow!(
                 "consenting roster smaller than threshold: {}/{}",
@@ -144,7 +163,10 @@ impl FrostCoordinator {
             return Err(anyhow!("share from non-member: {}", s.xid));
         }
         if s.session != self.session_id {
-            return Err(anyhow!("share has wrong session for member {}", s.xid));
+            return Err(anyhow!(
+                "share has wrong session for member {}",
+                s.xid
+            ));
         }
         match self.shares.get(&s.xid) {
             None => {
@@ -176,7 +198,10 @@ impl FrostCoordinator {
                 commitments: self.commitments.clone().into_values().collect(),
             },
         };
-        let shares = FrostSignatureShares::new(self.session_id, self.shares.into_values().collect());
+        let shares = FrostSignatureShares::new(
+            self.session_id,
+            self.shares.into_values().collect(),
+        );
         aggregate_and_attach_signature(&msg, &self.group, &pkg, &shares)
     }
 

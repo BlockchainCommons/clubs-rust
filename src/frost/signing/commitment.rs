@@ -1,4 +1,4 @@
-use bc_components::{XID, ARID};
+use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
 use known_values::HOLDER;
 
@@ -11,12 +11,26 @@ pub struct FrostSigningCommitment {
 }
 
 impl FrostSigningCommitment {
-    pub fn new(xid: XID, session: ARID, hiding: impl AsRef<[u8]>, binding: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+    pub fn new(
+        xid: XID,
+        session: ARID,
+        hiding: impl AsRef<[u8]>,
+        binding: impl AsRef<[u8]>,
+    ) -> anyhow::Result<Self> {
         let h = hiding.as_ref();
         let b = binding.as_ref();
-        if h.len() != 33 { anyhow::bail!("invalid hiding length: {}", h.len()); }
-        if b.len() != 33 { anyhow::bail!("invalid binding length: {}", b.len()); }
-        Ok(Self { xid, session, hiding: ByteString::from(h), binding: ByteString::from(b) })
+        if h.len() != 33 {
+            anyhow::bail!("invalid hiding length: {}", h.len());
+        }
+        if b.len() != 33 {
+            anyhow::bail!("invalid binding length: {}", b.len());
+        }
+        Ok(Self {
+            xid,
+            session,
+            hiding: ByteString::from(h),
+            binding: ByteString::from(b),
+        })
     }
 }
 
@@ -42,9 +56,14 @@ impl TryFrom<Envelope> for FrostSigningCommitment {
         let xid: XID = envelope.try_object_for_predicate(HOLDER)?;
         let session: ARID = envelope.try_object_for_predicate("session")?;
         let hiding: ByteString = envelope.try_object_for_predicate("hiding")?;
-        let binding: ByteString = envelope.try_object_for_predicate("binding")?;
-        if hiding.len() != 33 { anyhow::bail!("invalid hiding length"); }
-        if binding.len() != 33 { anyhow::bail!("invalid binding length"); }
+        let binding: ByteString =
+            envelope.try_object_for_predicate("binding")?;
+        if hiding.len() != 33 {
+            anyhow::bail!("invalid hiding length");
+        }
+        if binding.len() != 33 {
+            anyhow::bail!("invalid binding length");
+        }
         Ok(FrostSigningCommitment { xid, session, hiding, binding })
     }
 }
@@ -62,7 +81,9 @@ mod tests {
         let session = bc_components::ARID::from_hex(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         );
-        let commit = FrostSigningCommitment::new(xid, session, [0xA1; 33], [0xB2; 33]).unwrap();
+        let commit =
+            FrostSigningCommitment::new(xid, session, [0xA1; 33], [0xB2; 33])
+                .unwrap();
         let env: Envelope = commit.clone().into();
         #[rustfmt::skip]
         let expected = (indoc! {r#"

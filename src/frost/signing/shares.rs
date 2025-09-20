@@ -10,7 +10,9 @@ pub struct FrostSignatureShares {
 }
 
 impl FrostSignatureShares {
-    pub fn new(session: ARID, shares: Vec<FrostSignatureShare>) -> Self { Self { session, shares } }
+    pub fn new(session: ARID, shares: Vec<FrostSignatureShare>) -> Self {
+        Self { session, shares }
+    }
 }
 
 impl From<FrostSignatureShares> for Envelope {
@@ -39,12 +41,15 @@ impl TryFrom<Envelope> for FrostSignatureShares {
         for assertion in envelope.assertions() {
             let pred_env = assertion.try_predicate()?;
             if let Ok(pred) = pred_env.try_leaf() {
-                if let Ok(name) = <String as TryFrom<_>>::try_from(pred.clone()) {
+                if let Ok(name) = <String as TryFrom<_>>::try_from(pred.clone())
+                {
                     if name == "share" {
                         let obj_env = assertion.try_object()?;
                         let s = FrostSignatureShare::try_from(obj_env)?;
                         if s.session != session {
-                            anyhow::bail!("share session mismatch in container");
+                            anyhow::bail!(
+                                "share session mismatch in container"
+                            );
                         }
                         shares.push(s);
                     }
@@ -71,9 +76,12 @@ mod tests {
         let session = bc_components::ARID::from_hex(
             "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         );
-        let s1 = FrostSignatureShare { xid: xid1, session, share: vec![0x01, 0x02] };
-        let s2 = FrostSignatureShare { xid: xid2, session, share: vec![0x03, 0x04] };
-        let shares = FrostSignatureShares::new(session, vec![s1.clone(), s2.clone()]);
+        let s1 =
+            FrostSignatureShare { xid: xid1, session, share: vec![0x01, 0x02] };
+        let s2 =
+            FrostSignatureShare { xid: xid2, session, share: vec![0x03, 0x04] };
+        let shares =
+            FrostSignatureShares::new(session, vec![s1.clone(), s2.clone()]);
         let env: Envelope = shares.clone().into();
         #[rustfmt::skip]
         let expected = (indoc! {r#"

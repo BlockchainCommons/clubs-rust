@@ -66,10 +66,8 @@ pub fn aggregate_and_attach_signature(
     let subj_env = signing_package_g.message.subject();
     let msg_digest = subj_env.digest();
     let msg_bytes: &[u8] = msg_digest.as_ref().as_ref();
-    let signing_package = frost_secp256k1_tr::SigningPackage::new(
-        frost_commitments,
-        msg_bytes,
-    );
+    let signing_package =
+        frost_secp256k1_tr::SigningPackage::new(frost_commitments, msg_bytes);
     // Convert shares
     let mut frost_shares: BTreeMap<
         frost_secp256k1_tr::Identifier,

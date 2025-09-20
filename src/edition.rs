@@ -225,7 +225,9 @@ pub mod permit {
 
 // EnvelopeEncodable via Into<Envelope>
 impl From<Edition> for Envelope {
-    fn from(value: Edition) -> Self { value.to_unsigned_envelope() }
+    fn from(value: Edition) -> Self {
+        value.to_unsigned_envelope()
+    }
 }
 
 // EnvelopeDecodable via TryFrom<Envelope>
@@ -276,8 +278,9 @@ impl TryFrom<Envelope> for Edition {
                         let holder_xid: Option<XID> = match assertion
                             .optional_assertion_with_predicate(HOLDER)?
                         {
-                            Some(holder_assertion) =>
-                                Some(holder_assertion.extract_object::<XID>()?),
+                            Some(holder_assertion) => {
+                                Some(holder_assertion.extract_object::<XID>()?)
+                            }
                             None => None,
                         };
                         // Push permit with optional holder

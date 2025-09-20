@@ -1,4 +1,4 @@
-use bc_components::{XID, ARID};
+use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
 use known_values::HOLDER;
 
@@ -29,7 +29,8 @@ impl TryFrom<Envelope> for FrostSignatureShare {
         }
         let xid: XID = envelope.try_object_for_predicate(HOLDER)?;
         let session: ARID = envelope.try_object_for_predicate("session")?;
-        let share_bs: ByteString = envelope.try_object_for_predicate("share")?;
+        let share_bs: ByteString =
+            envelope.try_object_for_predicate("share")?;
         let share: Vec<u8> = share_bs.into();
         Ok(FrostSignatureShare { xid, session, share })
     }
@@ -48,7 +49,8 @@ mod tests {
         let session = bc_components::ARID::from_hex(
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         );
-        let share = FrostSignatureShare { xid, session, share: vec![0x55, 0x66, 0x77] };
+        let share =
+            FrostSignatureShare { xid, session, share: vec![0x55, 0x66, 0x77] };
         let env: Envelope = share.clone().into();
         #[rustfmt::skip]
         let expected = (indoc! {r#"
