@@ -44,6 +44,9 @@ pub struct FrostProvenanceChain {
     /// Public anchor that identifies this chain; stays the same no matter which
     /// quorum advances it.
     chain_id: Vec<u8>,
+    /// The FROST group that controls the chain (kept for convenience when
+    /// orchestrating ceremonies).
+    group: FrostGroup,
     /// The group’s shared public key point on the curve; needed for VRF checks.
     group_point: ProjectivePoint,
 
@@ -74,6 +77,7 @@ impl FrostProvenanceChain {
         Ok(Self {
             resolution,
             chain_id: chain_id.clone(),
+            group: group.clone(),
             group_point,
             last_key: chain_id,
             ratchet_state: state,
@@ -93,6 +97,20 @@ impl FrostProvenanceChain {
     }
     pub fn resolution(&self) -> ProvenanceMarkResolution {
         self.resolution
+    }
+    pub fn group(&self) -> &FrostGroup { &self.group }
+    pub fn last_key(&self) -> &[u8] { &self.last_key }
+
+    pub fn next_message(&self) -> Result<(u64, Vec<u8>, ProjectivePoint)> {
+        let step = (self.sequence as u64) + 1;
+        let message = pm_message(
+            &self.group_point,
+            &self.chain_id,
+            &self.ratchet_state,
+            step,
+        )?;
+        let h_point = hash_to_curve(&message)?;
+        Ok((step, message, h_point))
     }
 
     pub fn verify_advance(
