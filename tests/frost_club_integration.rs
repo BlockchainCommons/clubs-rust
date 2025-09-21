@@ -16,6 +16,7 @@ use clubs::{
             FrostProvenanceChain, key_from_gamma, point_bytes,
         },
     },
+    provenance_mark_provider::ProvenanceMarkProvider,
     public_key_permit::PublicKeyPermit,
 };
 use dcbor::Date;
@@ -258,6 +259,7 @@ fn frost_club_integration_story() -> Result<()> {
     ];
 
     let mut published_marks: Vec<ProvenanceMark> = Vec::new();
+    let mut published_editions: Vec<Edition> = Vec::new();
 
     for (label, roster, date, body) in publishing_plan {
         let (mark, gamma_bytes, proof) = frost_pm_advance(
@@ -321,13 +323,28 @@ fn frost_club_integration_story() -> Result<()> {
         assert!(decrypted_once, "roster should decrypt the edition");
 
         published_marks.push(mark);
+        published_editions.push(verified);
     }
 
-    assert!(ProvenanceMark::is_sequence_valid(&published_marks));
+    assert!(
+        <ProvenanceMark as ProvenanceMarkProvider>::is_sequence_valid(
+            &published_marks
+        )
+    );
+    assert!(<Edition as ProvenanceMarkProvider>::is_sequence_valid(
+        &published_editions
+    ));
+    assert!(
+        published_editions
+            .first()
+            .map(|edition| edition.is_genesis())
+            .unwrap_or(false)
+    );
     for window in published_marks.windows(2) {
-        let current = &window[0];
-        let next = &window[1];
-        assert!(current.precedes(next));
+        assert!(window[0].precedes(&window[1]));
+    }
+    for window in published_editions.windows(2) {
+        assert!(window[0].precedes(&window[1]));
     }
 
     Ok(())

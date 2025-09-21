@@ -24,7 +24,10 @@ use known_values::{
 };
 use provenance_mark::ProvenanceMark;
 
-use crate::{Error, Result, public_key_permit::PublicKeyPermit};
+use crate::{
+    Error, Result, provenance_mark_provider::ProvenanceMarkProvider,
+    public_key_permit::PublicKeyPermit,
+};
 
 /// A single edition (revision) of a Club's content.
 #[derive(Clone, Debug, PartialEq)]
@@ -170,6 +173,10 @@ impl Edition {
         let verified = sealed.verify(verifier)?;
         Edition::try_from(verified)
     }
+}
+
+impl ProvenanceMarkProvider for Edition {
+    fn provenance_mark(&self) -> &ProvenanceMark { &self.provenance }
 }
 
 // EnvelopeEncodable via Into<Envelope>
