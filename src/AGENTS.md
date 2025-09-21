@@ -16,3 +16,5 @@ Also you will want to explore the APIs in these local crates:
 - bc-ur/
 - known-values/
 - provenance-mark/
+
+- In particular, make sure you are familiar with `bc-envelope/src/base/queries.rs`.
