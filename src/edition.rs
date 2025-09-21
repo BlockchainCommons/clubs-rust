@@ -15,13 +15,13 @@
 //!   helpers.
 
 use bc_components::{
-    Digest, DigestProvider, SSKRSpec, SealedMessage, Signature, Signer,
-    SymmetricKey, XID,
+    Digest, DigestProvider, SSKRSpec, SealedMessage, Signer, SymmetricKey,
+    Verifier, XID,
 };
 use bc_envelope::prelude::*;
 use known_values::{
     CONTENT, CONTENT_RAW, HAS_RECIPIENT_RAW, HOLDER, IS_A_RAW, PROVENANCE,
-    PROVENANCE_RAW, SIGNED, SIGNED_RAW,
+    PROVENANCE_RAW, SIGNED_RAW,
 };
 use provenance_mark::ProvenanceMark;
 
@@ -36,9 +36,6 @@ pub struct Edition {
     pub provenance: ProvenanceMark,
     /// Plaintext content to be sealed into this edition.
     pub content: Envelope,
-    /// Collected signatures on this edition (subject-level signatures by
-    /// default).
-    pub signatures: Vec<Signature>,
     /// Public-key permits attached to the edition.
     pub permits: Vec<PublicKeyPermit>,
 }
@@ -51,13 +48,7 @@ impl Edition {
         provenance: ProvenanceMark,
         content: Envelope,
     ) -> Self {
-        Self {
-            club_id,
-            provenance,
-            content,
-            signatures: Vec::new(),
-            permits: Vec::new(),
-        }
+        Self { club_id, provenance, content, permits: Vec::new() }
     }
 
     /// Build the unsigned, unsealed public metadata envelope for this edition.
@@ -73,10 +64,6 @@ impl Edition {
         // Include plaintext content (helpful for pre-seal transforms).
         // Consumers should use the sealed variant for distribution.
         let mut e = e.add_assertion(CONTENT, self.content.clone());
-        // Include any stored signatures.
-        for sig in &self.signatures {
-            e = e.add_assertion(SIGNED, sig.clone());
-        }
         // Include decode-variant permits to maintain idempotence.
         for permit in &self.permits {
             if let PublicKeyPermit::Decode { sealed, member_xid } = permit {
@@ -169,6 +156,13 @@ impl Edition {
         let signed = edition.sign(signer);
         Ok((signed, sskr_shares))
     }
+
+    /// Verify a signed edition envelope, unwrap it, and decode into an
+    /// `Edition`.
+    pub fn unseal(sealed: Envelope, verifier: &dyn Verifier) -> Result<Self> {
+        let verified = sealed.verify(verifier)?;
+        Edition::try_from(verified)
+    }
 }
 
 // EnvelopeEncodable via Into<Envelope>
@@ -188,7 +182,6 @@ impl TryFrom<Envelope> for Edition {
 
         let mut provenance: Option<ProvenanceMark> = None;
         let mut content: Option<Envelope> = None;
-        let mut signatures: Vec<Signature> = Vec::new();
         let mut permits: Vec<PublicKeyPermit> = Vec::new();
 
         for assertion in envelope.assertions() {
@@ -211,12 +204,7 @@ impl TryFrom<Envelope> for Edition {
                     // Object is an Envelope; clone it.
                     content = Some(obj.clone());
                 }
-                SIGNED_RAW => {
-                    if !obj.is_obscured() {
-                        let sig = obj.extract_subject::<Signature>()?;
-                        signatures.push(sig);
-                    }
-                }
+                SIGNED_RAW => {}
                 HAS_RECIPIENT_RAW => {
                     // Decode permit: extract sealed message and optional holder
                     // XID.
@@ -252,12 +240,6 @@ impl TryFrom<Envelope> for Edition {
             provenance.ok_or_else(|| Error::msg("Missing provenance"))?;
         let content = content.ok_or_else(|| Error::msg("Missing content"))?;
 
-        Ok(Edition {
-            club_id: club,
-            provenance,
-            content,
-            signatures,
-            permits,
-        })
+        Ok(Edition { club_id: club, provenance, content, permits })
     }
 }

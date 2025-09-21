@@ -6,7 +6,7 @@ use bc_envelope::prelude::*;
 use bc_xid::XIDDocument;
 use clubs::{edition::Edition, public_key_permit::PublicKeyPermit};
 use indoc::indoc;
-use known_values::{CONTENT, NAME};
+use known_values::NAME;
 use provenance_mark::{ProvenanceMarkGenerator, ProvenanceMarkResolution};
 
 fn fixed_key(byte: u8) -> PrivateKeyBase {
@@ -103,7 +103,8 @@ fn basic_scenario_alice_bob_charlie() {
 
     // Round-trip: convert envelope back to Edition and examine its
     // serialization.
-    let edition_rt = Edition::try_from(sealed.clone()).unwrap();
+    let edition_rt =
+        Edition::unseal(sealed.clone(), &club_k.public_keys()).unwrap();
     let roundtrip_env: Envelope = edition_rt.clone().into();
     #[rustfmt::skip]
     let expected_rt = (indoc! {r#"
@@ -126,7 +127,6 @@ fn basic_scenario_alice_bob_charlie() {
             ]
             'content': ENCRYPTED
             'provenance': ProvenanceMark(ef7c82c8)
-            'signed': Signature
         ]
     "#}).trim();
     assert_eq!(roundtrip_env.format(), expected_rt);
@@ -137,18 +137,20 @@ fn basic_scenario_alice_bob_charlie() {
     assert_eq!(edition_rt, edition_rt2);
 
     // Member decrypts: Alice unseals and reads content
-    let sealed_messages = sealed.recipients().unwrap();
     let mut content_key: Option<SymmetricKey> = None;
-    for sm in sealed_messages {
-        if let Ok(plaintext) = sm.decrypt(&alice_k) {
-            let key = SymmetricKey::from_tagged_cbor_data(plaintext).unwrap();
-            content_key = Some(key);
-            break;
+    for permit in &edition_rt.permits {
+        if let PublicKeyPermit::Decode { sealed, .. } = permit {
+            if let Ok(plaintext) = sealed.decrypt(&alice_k) {
+                let key =
+                    SymmetricKey::from_tagged_cbor_data(plaintext).unwrap();
+                content_key = Some(key);
+                break;
+            }
         }
     }
     let content_key =
         content_key.expect("Alice should be able to unwrap content key");
-    let encrypted_content = sealed.object_for_predicate(CONTENT).unwrap();
+    let encrypted_content = edition_rt.content.clone();
     let decrypted_wrapped =
         encrypted_content.decrypt_subject(&content_key).unwrap();
     let decrypted_content = decrypted_wrapped.try_unwrap().unwrap();
