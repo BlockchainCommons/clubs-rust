@@ -38,13 +38,9 @@ impl FrostPmParticipant {
         }
     }
 
-    pub fn from_core(core: FrostParticipantCore) -> Self {
-        Self::new(core)
-    }
+    pub fn from_core(core: FrostParticipantCore) -> Self { Self::new(core) }
 
-    pub fn xid(&self) -> XID {
-        self.core.xid()
-    }
+    pub fn xid(&self) -> XID { self.core.xid() }
 
     fn key_package(&self) -> &frost::keys::KeyPackage {
         self.core.key_package()
@@ -118,9 +114,9 @@ impl FrostPmParticipant {
         &mut self,
         challenge: &Scalar,
     ) -> Result<FrostPmResponseShare> {
-        let session = self.session.ok_or_else(|| {
-            Error::msg("round1_commit must be called first")
-        })?;
+        let session = self
+            .session
+            .ok_or_else(|| Error::msg("round1_commit must be called first"))?;
         let nonce = self.nonce.ok_or_else(|| {
             Error::msg("round2_emit_gamma must be called first")
         })?;
