@@ -95,39 +95,56 @@ fn run_ceremony(
 }
 
 #[test]
-fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
+fn frost_provenance_story() -> clubs::Result<()> {
+    // Provision three club members with their own XIDs so they can hold FROST
+    // signing shares and appear as independent actors in the ceremony.
     let alice_doc =
         XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
     let bob_doc = XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
     let charlie_doc =
         XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
 
+    // Establish a 2-of-3 threshold group, mirroring the quorum size we expect
+    // for provenance publishing.
     let members = vec![alice_doc.xid(), bob_doc.xid(), charlie_doc.xid()];
     let (group, participant_cores): (
         FrostGroup,
         BTreeMap<XID, clubs::frost::FrostParticipantCore>,
     ) = FrostGroup::new_with_trusted_dealer(2, members.clone())?;
 
+    // Turn each participant core into the provenance-mark aware participant
+    // type so they can perform the VRF-specific rounds.
     let mut participants: BTreeMap<XID, FrostPmParticipant> = participant_cores
         .into_iter()
         .map(|(xid, core)| (xid, FrostPmParticipant::from_core(core)))
         .collect();
 
+    // Both publisher and verifier start from the same genesis state to ensure
+    // they agree on the public chain inputs.
     let genesis = iso_date("2025-01-01");
+    // The publishing chain mirrors the coordinator's evolving view while it
+    // aggregates shares and produces new marks.
     let mut publishing_chain = FrostProvenanceChain::new(
         &group,
         ProvenanceMarkResolution::Quartile,
         b"Gordian Club Minutes",
         genesis.clone(),
     )?;
+    // The verifier chain simulates an external observer that only consumes the
+    // published artifacts; keeping it separate demonstrates that verification
+    // does not depend on the publisher's mutable state.
     let mut verifier_chain = FrostProvenanceChain::new(
         &group,
         ProvenanceMarkResolution::Quartile,
         b"Gordian Club Minutes",
         genesis,
     )?;
+    // Single coordinator drives each ceremony, collecting commitments and
+    // assembling the aggregate responses.
     let mut coordinator = FrostPmCoordinator::new(group.clone());
 
+    // Narrated plan of meetings: each tuple carries the roster that will make
+    // up the signing quorum and the date stamped into the mark.
     let publishing_plan: Vec<(&str, Vec<_>, Date)> = vec![
         (
             "Founding minutes signed by Alice and Bob",
@@ -148,6 +165,8 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
 
     let mut advances: Vec<Advance> = Vec::new();
     for (blurb, roster, date) in publishing_plan {
+        // Advance the publishing chain by running a full two-round FROST VRF
+        // ceremony for the requested roster and date.
         let advance = run_ceremony(
             &mut publishing_chain,
             &mut coordinator,
@@ -156,6 +175,8 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
             date,
         )?;
 
+        // An independent verifier validates the mark using only public inputs,
+        // emulating how observers would audit the chain.
         verifier_chain.verify_advance(
             &advance.mark,
             &advance.gamma_bytes,
@@ -166,6 +187,8 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
         eprintln!("{}", blurb);
     }
 
+    // The marks must form a well-ordered provenance chain that reveals the
+    // prior secret and introduces the next one in sequence.
     let marks = collect_marks(&advances);
     assert!(ProvenanceMark::is_sequence_valid(&marks));
     for window in marks.windows(2) {
@@ -174,6 +197,7 @@ fn frost_provenance_story_alice_bob_charlie() -> clubs::Result<()> {
         assert!(current.precedes(next));
     }
 
+    // All marks should stay bound to the publishing chain's identifier.
     let chain_id = verifier_chain.chain_id().to_vec();
     for advance in &advances {
         assert_eq!(advance.mark.chain_id(), chain_id);
