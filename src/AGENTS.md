@@ -1,4 +1,4 @@
-We are working in this Rust workspace, but specifically on the crate called `clubs`.
+# Clubs Overview
 
 For minimal context, read these files:
 
@@ -16,7 +16,3 @@ Also you will want to explore the APIs in these local crates:
 - bc-ur/
 - known-values/
 - provenance-mark/
-
-Guidelines:
-
-- Run `cargo clippy` and fix any lints before you end each turn.
