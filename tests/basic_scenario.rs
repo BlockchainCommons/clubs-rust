@@ -54,7 +54,7 @@ fn basic_scenario_alice_bob_charlie() {
     let group = SSKRGroupSpec::new(2, 3).unwrap();
     let spec = SSKRSpec::new(1, vec![group]).unwrap();
     let (sealed, shares_opt) = edition
-        .seal_with_permits(&recipients, Some(spec), &club_k, None)
+        .seal_with_permits(&recipients, Some(spec), &club_k)
         .unwrap();
     let shares = shares_opt.expect("Expected SSKR shares when spec provided");
     assert_eq!(shares.len(), 1);
@@ -66,29 +66,40 @@ fn basic_scenario_alice_bob_charlie() {
     // Phase Two: test against expected output.
     #[rustfmt::skip]
     let expected = (indoc! {r#"
-        XID(02dca4b9) [
-            'isA': "Edition"
-            {
-                'hasRecipient': SealedMessage
-            } [
-                'holder': XID(1944dcbc)
+        {
+            XID(02dca4b9) [
+                'isA': "Edition"
+                {
+                    'hasRecipient': SealedMessage
+                } [
+                    'holder': XID(1944dcbc)
+                ]
+                {
+                    'hasRecipient': SealedMessage
+                } [
+                    'holder': XID(448e2e0b)
+                ]
+                {
+                    'hasRecipient': SealedMessage
+                } [
+                    'holder': XID(74107ca5)
+                ]
+                'content': ENCRYPTED
+                'provenance': ProvenanceMark(ef7c82c8)
             ]
-            {
-                'hasRecipient': SealedMessage
-            } [
-                'holder': XID(448e2e0b)
-            ]
-            {
-                'hasRecipient': SealedMessage
-            } [
-                'holder': XID(74107ca5)
-            ]
-            'content': ENCRYPTED
-            'provenance': ProvenanceMark(ef7c82c8)
+        } [
             'signed': Signature
         ]
     "#}).trim();
     assert_eq!(sealed.format(), expected);
+
+    #[rustfmt::skip]
+    let expected = (indoc! {r#"
+        ENCRYPTED [
+            'sskrShare': SSKRShare
+        ]
+    "#}).trim();
+    assert_eq!(shares[0][0].format(), expected);
 
     // Round-trip: convert envelope back to Edition and examine its
     // serialization.

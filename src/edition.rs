@@ -113,7 +113,6 @@ impl Edition {
         recipients: &[PublicKeyPermit],
         sskr_spec: Option<SSKRSpec>,
         signer: &dyn Signer,
-        signing_options: Option<SigningOptions>,
     ) -> Result<(Envelope, Option<Vec<Vec<Envelope>>>)> {
         // Fresh content key per edition.
         let content_key = SymmetricKey::new();
@@ -167,7 +166,7 @@ impl Edition {
             edition = edition.add_assertion(CONTENT, self.content.clone());
         }
 
-        let signed = edition.add_signature_opt(signer, signing_options, None);
+        let signed = edition.sign(signer);
         Ok((signed, sskr_shares))
     }
 }
