@@ -10,8 +10,8 @@ use crate::{
 };
 
 impl FrostGroup {
-    /// Attach a pre-aggregated BIP-340 signature to the envelope and verify with
-    /// the group's public key.
+    /// Attach a pre-aggregated BIP-340 signature to the envelope and verify
+    /// with the group's public key.
     pub fn attach_preaggregated_signature(
         &self,
         envelope: &Envelope,

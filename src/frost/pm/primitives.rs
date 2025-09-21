@@ -1,7 +1,8 @@
 //! Low-level cryptographic primitives for FROST-controlled provenance marks.
 
-use core::ops::Add;
+use core::{convert::TryInto, ops::Add};
 
+use bc_envelope::prelude::*;
 use frost_secp256k1_tr as frost;
 use frost_secp256k1_tr::Group;
 use k256::{
@@ -62,6 +63,68 @@ pub struct DleqProof {
     pub e: Scalar,
     /// Schnorr response `z = k + e·x`.
     pub z: Scalar,
+}
+
+impl From<DleqProof> for Envelope {
+    fn from(value: DleqProof) -> Self {
+        let mut e = Envelope::new(known_values::UNIT);
+        e = e.add_type("FrostPmDleqProof");
+        e = e.add_assertion(
+            "a",
+            CBOR::from(ByteString::from(value.a_bytes.to_vec())),
+        );
+        e = e.add_assertion(
+            "b",
+            CBOR::from(ByteString::from(value.b_bytes.to_vec())),
+        );
+        e = e.add_assertion(
+            "challenge",
+            CBOR::from(ByteString::from(scalar_to_be_bytes(&value.e).to_vec())),
+        );
+        e = e.add_assertion(
+            "response",
+            CBOR::from(ByteString::from(scalar_to_be_bytes(&value.z).to_vec())),
+        );
+        e
+    }
+}
+
+impl TryFrom<Envelope> for DleqProof {
+    type Error = Error;
+
+    fn try_from(envelope: Envelope) -> crate::Result<Self> {
+        envelope.check_type_envelope("FrostPmDleqProof")?;
+        let subj_env = envelope.subject();
+        let kv = subj_env.try_known_value()?;
+        if kv.value() != known_values::UNIT.value() {
+            return Err(Error::msg("unexpected subject for FrostPmDleqProof"));
+        }
+        let a_bs: ByteString = envelope.try_object_for_predicate("a")?;
+        let b_bs: ByteString = envelope.try_object_for_predicate("b")?;
+        let challenge_bs: ByteString =
+            envelope.try_object_for_predicate("challenge")?;
+        let response_bs: ByteString =
+            envelope.try_object_for_predicate("response")?;
+        let a_vec: Vec<u8> = a_bs.into();
+        let b_vec: Vec<u8> = b_bs.into();
+        let challenge_vec: Vec<u8> = challenge_bs.into();
+        let response_vec: Vec<u8> = response_bs.into();
+        let a_bytes: [u8; 33] = a_vec
+            .try_into()
+            .map_err(|_| Error::msg("invalid a length"))?;
+        let b_bytes: [u8; 33] = b_vec
+            .try_into()
+            .map_err(|_| Error::msg("invalid b length"))?;
+        let challenge_arr: [u8; 32] = challenge_vec
+            .try_into()
+            .map_err(|_| Error::msg("invalid challenge length"))?;
+        let response_arr: [u8; 32] = response_vec
+            .try_into()
+            .map_err(|_| Error::msg("invalid response length"))?;
+        let e = scalar_from_be_bytes(&challenge_arr)?;
+        let z = scalar_from_be_bytes(&response_arr)?;
+        Ok(Self { a_bytes, b_bytes, e, z })
+    }
 }
 
 /// Return the compressed 33-byte SEC1 encoding for a projective point.
@@ -285,4 +348,42 @@ pub fn scalar_from_be_bytes(bytes: &[u8]) -> crate::Result<Scalar> {
 
 pub fn scalar_to_be_bytes(scalar: &Scalar) -> [u8; 32] {
     scalar.to_bytes().into()
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::*;
+
+    #[test]
+    fn frost_pm_dleq_proof_roundtrip_text() {
+        let a_point = ProjectivePoint::GENERATOR * Scalar::from(3u64);
+        let b_point = ProjectivePoint::GENERATOR * Scalar::from(9u64);
+        let a_bytes = point_bytes(&a_point).unwrap();
+        let b_bytes = point_bytes(&b_point).unwrap();
+        let proof = DleqProof {
+            a_bytes,
+            b_bytes,
+            e: Scalar::from(17u64),
+            z: Scalar::from(23u64),
+        };
+        let env: Envelope = proof.clone().into();
+        #[rustfmt::skip]
+        let expected = (indoc! {r#"
+            '' [
+                'isA': "FrostPmDleqProof"
+                "a": Bytes(33)
+                "b": Bytes(33)
+                "challenge": Bytes(32)
+                "response": Bytes(32)
+            ]
+        "#}).trim();
+        assert_eq!(env.format(), expected);
+        let rt = DleqProof::try_from(env).unwrap();
+        assert_eq!(proof.a_bytes, rt.a_bytes);
+        assert_eq!(proof.b_bytes, rt.b_bytes);
+        assert_eq!(scalar_to_be_bytes(&proof.e), scalar_to_be_bytes(&rt.e));
+        assert_eq!(scalar_to_be_bytes(&proof.z), scalar_to_be_bytes(&rt.z));
+    }
 }

@@ -45,12 +45,8 @@ impl FrostSigningCoordinator {
         }
     }
 
-    pub fn group(&self) -> &FrostGroup {
-        &self.group
-    }
-    pub fn session_id(&self) -> ARID {
-        self.session_id
-    }
+    pub fn group(&self) -> &FrostGroup { &self.group }
+    pub fn session_id(&self) -> ARID { self.session_id }
     pub fn set_session_id(&mut self, session_id: ARID) {
         self.session_id = session_id;
     }

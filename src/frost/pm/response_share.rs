@@ -1,8 +1,10 @@
 use bc_components::{ARID, XID};
+use bc_envelope::prelude::*;
 use k256::Scalar;
+use known_values::HOLDER;
 
 use crate::{
-    Result,
+    Error, Result,
     frost::pm::{scalar_from_be_bytes, scalar_to_be_bytes},
 };
 
@@ -24,6 +26,74 @@ impl FrostPmResponseShare {
     }
 }
 
+impl From<FrostPmResponseShare> for Envelope {
+    fn from(value: FrostPmResponseShare) -> Self {
+        let mut e = Envelope::new(known_values::UNIT);
+        e = e.add_type("FrostPmResponseShare");
+        e = e.add_assertion(HOLDER, value.xid);
+        e = e.add_assertion("session", value.session);
+        e = e.add_assertion(
+            "z",
+            CBOR::from(ByteString::from(value.z_bytes.to_vec())),
+        );
+        e
+    }
+}
+
+impl TryFrom<Envelope> for FrostPmResponseShare {
+    type Error = Error;
+
+    fn try_from(envelope: Envelope) -> Result<Self> {
+        envelope.check_type_envelope("FrostPmResponseShare")?;
+        let subj_env = envelope.subject();
+        let kv = subj_env.try_known_value()?;
+        if kv.value() != known_values::UNIT.value() {
+            return Err(Error::msg(
+                "unexpected subject for FrostPmResponseShare",
+            ));
+        }
+        let xid: XID = envelope.try_object_for_predicate(HOLDER)?;
+        let session: ARID = envelope.try_object_for_predicate("session")?;
+        let z_bs: ByteString = envelope.try_object_for_predicate("z")?;
+        let z_vec: Vec<u8> = z_bs.into();
+        let z_bytes: [u8; 32] = z_vec
+            .try_into()
+            .map_err(|_| Error::msg("invalid z length"))?;
+        Ok(Self { xid, session, z_bytes })
+    }
+}
+
 pub(crate) fn response_share_scalar_from_bytes(bytes: &[u8]) -> Result<Scalar> {
     scalar_from_be_bytes(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::*;
+
+    #[test]
+    fn frost_pm_response_share_roundtrip_text() {
+        let xid = XID::from_hex(
+            "3333333333333333333333333333333333333333333333333333333333333333",
+        );
+        let session = ARID::from_hex(
+            "4444444444444444444444444444444444444444444444444444444444444444",
+        );
+        let share = FrostPmResponseShare { xid, session, z_bytes: [0x44; 32] };
+        let env: Envelope = share.clone().into();
+        #[rustfmt::skip]
+        let expected = (indoc! {r#"
+            '' [
+                'isA': "FrostPmResponseShare"
+                "session": ARID(44444444)
+                "z": Bytes(32)
+                'holder': XID(33333333)
+            ]
+        "#}).trim();
+        assert_eq!(env.format(), expected);
+        let rt = FrostPmResponseShare::try_from(env).unwrap();
+        assert_eq!(share, rt);
+    }
 }
