@@ -16,3 +16,7 @@ Also you will want to explore the APIs in these local crates:
 - bc-ur/
 - known-values/
 - provenance-mark/
+
+## Plan for FROST-Controlled Clubs
+
+- Define a plan to use FROST for club control, where each Edition published by a club is controlled by a FROST group, including the generation of provenance marks for each Edition.
