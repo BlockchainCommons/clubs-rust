@@ -20,8 +20,7 @@ use bc_components::{
 };
 use bc_envelope::prelude::*;
 use known_values::{
-    CONTENT, CONTENT_RAW, HAS_RECIPIENT_RAW, HOLDER, IS_A_RAW, PROVENANCE,
-    PROVENANCE_RAW, SIGNED_RAW,
+    HAS_RECIPIENT_RAW, HOLDER, IS_A_RAW, PROVENANCE, PROVENANCE_RAW, SIGNED_RAW,
 };
 use provenance_mark::ProvenanceMark;
 
@@ -53,17 +52,19 @@ impl Edition {
 
     /// Build the unsigned, unsealed public metadata envelope for this edition.
     ///
-    /// Subject: Club `XID`
-    /// Assertions: `provenance` and `content` (plaintext)
+    /// Subject: Content (plaintext wrapped or encrypted)
+    /// Assertions: club XID and provenance mark
     pub fn to_unsigned_envelope(&self) -> Envelope {
-        let mut e = Envelope::new(self.club_id);
-        e = e.add_type("Edition");
+        let subject =
+            if self.content.is_encrypted() || self.content.is_wrapped() {
+                self.content.clone()
+            } else {
+                self.content.clone().wrap()
+            };
 
+        let mut e = subject.add_type("Edition");
+        e = e.add_assertion("club", self.club_id);
         e = e.add_assertion(PROVENANCE, self.provenance.clone());
-
-        // Include plaintext content (helpful for pre-seal transforms).
-        // Consumers should use the sealed variant for distribution.
-        let mut e = e.add_assertion(CONTENT, self.content.clone());
         // Include decode-variant permits to maintain idempotence.
         for permit in &self.permits {
             if let PublicKeyPermit::Decode { sealed, member_xid } = permit {
@@ -105,17 +106,26 @@ impl Edition {
         let content_key = SymmetricKey::new();
         let do_encrypt = !recipients.is_empty() || sskr_spec.is_some();
 
-        // Build base envelope with provenance.
-        let mut edition = Envelope::new(self.club_id)
+        // Build base envelope with content as the subject.
+        let mut base_subject =
+            if self.content.is_encrypted() || self.content.is_wrapped() {
+                self.content.clone()
+            } else {
+                self.content.clone().wrap()
+            };
+
+        if do_encrypt {
+            base_subject = self.content.encrypt(&content_key);
+        }
+
+        let mut edition = base_subject
             .add_type("Edition")
+            .add_assertion("club", self.club_id)
             .add_assertion(PROVENANCE, self.provenance.clone());
 
         let mut sskr_shares: Option<Vec<Vec<Envelope>>> = None;
 
         if do_encrypt {
-            let encrypted_content = self.content.encrypt(&content_key);
-            edition = edition.add_assertion(CONTENT, encrypted_content.clone());
-
             // Compute edition-id for AAD binding of permits.
             let edition_id_aad: Vec<u8> = edition.digest().data().to_vec();
 
@@ -146,11 +156,8 @@ impl Edition {
 
             if let Some(spec) = sskr_spec.as_ref() {
                 sskr_shares =
-                    Some(encrypted_content.sskr_split(spec, &content_key)?);
+                    Some(base_subject.sskr_split(spec, &content_key)?);
             }
-        } else {
-            // Leave content plaintext.
-            edition = edition.add_assertion(CONTENT, self.content.clone());
         }
 
         let signed = edition.sign(signer);
@@ -177,68 +184,85 @@ impl TryFrom<Envelope> for Edition {
     fn try_from(envelope: Envelope) -> Result<Self> {
         envelope.check_type_envelope("Edition")?;
 
-        // Subject must be the club XID
-        let club: XID = envelope.extract_subject()?;
-
+        let subject = envelope.subject();
+        let content: Option<Envelope> = if subject.is_wrapped() {
+            Some(subject.try_unwrap()?)
+        } else {
+            Some(subject.clone())
+        };
         let mut provenance: Option<ProvenanceMark> = None;
-        let mut content: Option<Envelope> = None;
         let mut permits: Vec<PublicKeyPermit> = Vec::new();
+        let mut club_id: Option<XID> = None;
 
         for assertion in envelope.assertions() {
-            let pred = assertion.try_predicate()?.try_known_value()?.value();
-            let obj = assertion.try_object()?;
-            match pred {
-                IS_A_RAW => {
-                    // Already checked above.
-                }
-                PROVENANCE_RAW => {
-                    if provenance.is_some() {
-                        return Err(Error::msg("Multiple provenance marks"));
+            let predicate = assertion.try_predicate()?;
+
+            if let Ok(kv) = predicate.try_known_value() {
+                let obj = assertion.try_object()?;
+                match kv.value() {
+                    IS_A_RAW => {
+                        // Already checked above.
                     }
-                    provenance = Some(ProvenanceMark::try_from(obj.clone())?);
-                }
-                CONTENT_RAW => {
-                    if content.is_some() {
-                        return Err(Error::msg("Multiple content assertions"));
+                    PROVENANCE_RAW => {
+                        if provenance.is_some() {
+                            return Err(Error::msg(
+                                "Multiple provenance marks",
+                            ));
+                        }
+                        provenance =
+                            Some(ProvenanceMark::try_from(obj.clone())?);
                     }
-                    // Object is an Envelope; clone it.
-                    content = Some(obj.clone());
-                }
-                SIGNED_RAW => {}
-                HAS_RECIPIENT_RAW => {
-                    // Decode permit: extract sealed message and optional holder
-                    // XID.
-                    if !obj.is_obscured() {
-                        let sealed = obj.extract_subject::<SealedMessage>()?;
-                        // Find optional holder assertion(s) on the permit
-                        // assertion envelope.
-                        let holder_xid: Option<XID> = match assertion
-                            .optional_assertion_with_predicate(HOLDER)?
-                        {
-                            Some(holder_assertion) => {
-                                Some(holder_assertion.extract_object::<XID>()?)
-                            }
-                            None => None,
-                        };
-                        // Push permit with optional holder
-                        let p = PublicKeyPermit::Decode {
-                            sealed,
-                            member_xid: holder_xid,
-                        };
-                        permits.push(p);
+                    SIGNED_RAW => {}
+                    HAS_RECIPIENT_RAW => {
+                        // Decode permit: extract sealed message and optional
+                        // holder XID.
+                        if !obj.is_obscured() {
+                            let sealed =
+                                obj.extract_subject::<SealedMessage>()?;
+                            // Find optional holder assertion(s) on the permit
+                            // assertion envelope.
+                            let holder_xid: Option<XID> = match assertion
+                                .optional_assertion_with_predicate(HOLDER)?
+                            {
+                                Some(holder_assertion) => Some(
+                                    holder_assertion.extract_object::<XID>()?,
+                                ),
+                                None => None,
+                            };
+                            // Push permit with optional holder
+                            let p = PublicKeyPermit::Decode {
+                                sealed,
+                                member_xid: holder_xid,
+                            };
+                            permits.push(p);
+                        }
+                    }
+                    _ => {
+                        return Err(Error::msg(
+                            "Unexpected predicate in Edition envelope",
+                        ));
                     }
                 }
-                _ => {
-                    return Err(Error::msg(
-                        "Unexpected predicate in Edition envelope",
-                    ));
+            } else if predicate == Envelope::new("club") {
+                if club_id.is_some() {
+                    return Err(Error::msg("Multiple club assertions"));
                 }
+                let obj = assertion.try_object()?;
+                if obj.is_obscured() {
+                    return Err(Error::msg("Club assertion is obscured"));
+                }
+                club_id = Some(obj.extract_subject::<XID>()?);
+            } else {
+                return Err(Error::msg(
+                    "Unexpected predicate in Edition envelope",
+                ));
             }
         }
 
         let provenance =
             provenance.ok_or_else(|| Error::msg("Missing provenance"))?;
         let content = content.ok_or_else(|| Error::msg("Missing content"))?;
+        let club = club_id.ok_or_else(|| Error::msg("Missing club"))?;
 
         Ok(Edition { club_id: club, provenance, content, permits })
     }

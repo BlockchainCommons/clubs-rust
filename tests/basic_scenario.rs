@@ -67,7 +67,7 @@ fn basic_scenario_alice_bob_charlie() {
     #[rustfmt::skip]
     let expected = (indoc! {r#"
         {
-            XID(02dca4b9) [
+            ENCRYPTED [
                 'isA': "Edition"
                 {
                     'hasRecipient': SealedMessage
@@ -84,7 +84,7 @@ fn basic_scenario_alice_bob_charlie() {
                 } [
                     'holder': XID(74107ca5)
                 ]
-                'content': ENCRYPTED
+                "club": XID(02dca4b9)
                 'provenance': ProvenanceMark(ef7c82c8)
             ]
         } [
@@ -108,7 +108,7 @@ fn basic_scenario_alice_bob_charlie() {
     let roundtrip_env: Envelope = edition_rt.clone().into();
     #[rustfmt::skip]
     let expected_rt = (indoc! {r#"
-        XID(02dca4b9) [
+        ENCRYPTED [
             'isA': "Edition"
             {
                 'hasRecipient': SealedMessage
@@ -125,7 +125,7 @@ fn basic_scenario_alice_bob_charlie() {
             } [
                 'holder': XID(74107ca5)
             ]
-            'content': ENCRYPTED
+            "club": XID(02dca4b9)
             'provenance': ProvenanceMark(ef7c82c8)
         ]
     "#}).trim();
