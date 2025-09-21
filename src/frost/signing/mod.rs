@@ -1,5 +1,6 @@
 pub mod commitment;
 pub mod coordinator;
+pub mod group_aggregate;
 pub mod package;
 pub mod participant;
 pub mod share;

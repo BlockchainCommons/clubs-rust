@@ -4,13 +4,12 @@ use bc_components::{ARID, XID};
 use bc_envelope::prelude::*;
 
 use super::{
-    super::{aggregate::aggregate_and_attach_signature, group::FrostGroup},
     commitment::FrostSigningCommitment,
     package::{FrostSigningPackage, build_signing_package},
     share::FrostSignatureShare,
     shares::FrostSignatureShares,
 };
-use crate::{Error, Result};
+use crate::{Error, Result, frost::FrostGroup};
 
 /// A neutral coordinator for a FROST signing ceremony.
 ///
@@ -46,8 +45,12 @@ impl FrostSigningCoordinator {
         }
     }
 
-    pub fn group(&self) -> &FrostGroup { &self.group }
-    pub fn session_id(&self) -> ARID { self.session_id }
+    pub fn group(&self) -> &FrostGroup {
+        &self.group
+    }
+    pub fn session_id(&self) -> ARID {
+        self.session_id
+    }
     pub fn set_session_id(&mut self, session_id: ARID) {
         self.session_id = session_id;
     }
@@ -208,7 +211,8 @@ impl FrostSigningCoordinator {
             self.session_id,
             self.shares.into_values().collect(),
         );
-        aggregate_and_attach_signature(&msg, &self.group, &pkg, &shares)
+        self.group
+            .aggregate_and_attach_signature(&msg, &pkg, &shares)
     }
 
     /// Record explicit consent from a member after viewing the message.
