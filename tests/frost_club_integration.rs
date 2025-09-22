@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use bc_components::{
-    PrivateKeyBase, PublicKeysProvider, SealedMessage, SymmetricKey, XID,
-    XIDProvider,
+    Digest, PrivateKeyBase, PublicKeysProvider, SealedMessage, SymmetricKey,
+    XID, XIDProvider,
 };
 use bc_envelope::prelude::*;
 use bc_xid::XIDDocument;
@@ -11,9 +11,14 @@ use clubs::{
     edition::Edition,
     frost::{
         FrostGroup, FrostSigningCoordinator, FrostSigningParticipant,
+        content::{
+            CONTENT_MESSAGE_PREFIX, FrostContentCoordinator, FrostContentKey,
+            FrostContentParticipant,
+        },
         pm::{
             DleqProof, FrostPmCoordinator, FrostPmParticipant,
             FrostProvenanceChain, key_from_gamma, point_bytes,
+            primitives::hash_to_curve,
         },
     },
     provenance_mark_provider::ProvenanceMarkProvider,
@@ -94,8 +99,8 @@ fn frost_pm_advance(
 fn build_unsigned_sealed_edition(
     edition: &Edition,
     recipients: &[PublicKeyPermit],
+    content_key: &SymmetricKey,
 ) -> Result<Envelope> {
-    let content_key = SymmetricKey::new();
     let do_encrypt = !recipients.is_empty();
 
     let mut base_subject =
@@ -106,7 +111,7 @@ fn build_unsigned_sealed_edition(
         };
 
     if do_encrypt {
-        base_subject = edition.content.encrypt(&content_key);
+        base_subject = edition.content.encrypt(content_key);
     }
 
     let mut envelope = base_subject
@@ -146,6 +151,52 @@ fn build_unsigned_sealed_edition(
     Ok(envelope)
 }
 
+fn frost_content_generate_key(
+    group: &FrostGroup,
+    coordinator: &mut FrostContentCoordinator,
+    participants: &mut BTreeMap<XID, FrostContentParticipant>,
+    roster: &[XID],
+    digest: &Digest,
+) -> Result<FrostContentKey> {
+    coordinator.start_session();
+    let session = coordinator.session_id();
+
+    let mut msg =
+        Vec::with_capacity(CONTENT_MESSAGE_PREFIX.len() + digest.data().len());
+    msg.extend_from_slice(CONTENT_MESSAGE_PREFIX);
+    msg.extend_from_slice(digest.data());
+    let h_point = hash_to_curve(&msg)?;
+
+    for xid in roster {
+        let participant = participants.get_mut(xid).ok_or_else(|| {
+            Error::msg(format!("unknown content participant: {}", xid))
+        })?;
+        let commitment = participant.round1_commit(session, &h_point)?;
+        coordinator.add_commitment(commitment)?;
+    }
+
+    let package = coordinator.signing_package_for(roster, digest)?;
+
+    for xid in roster {
+        let participant = participants.get_mut(xid).ok_or_else(|| {
+            Error::msg(format!("unknown content participant: {}", xid))
+        })?;
+        let gamma_share = participant.round2_emit_gamma(group, &package)?;
+        coordinator.record_gamma_share(gamma_share)?;
+    }
+
+    let challenge = coordinator.challenge()?;
+    for xid in roster {
+        let participant = participants.get_mut(xid).ok_or_else(|| {
+            Error::msg(format!("unknown content participant: {}", xid))
+        })?;
+        let response = participant.finalize_response(&challenge)?;
+        coordinator.record_response(response)?;
+    }
+
+    Ok(coordinator.finalize()?)
+}
+
 fn frost_sign_envelope(
     group: &FrostGroup,
     mut coordinator: FrostSigningCoordinator,
@@ -180,8 +231,18 @@ fn frost_sign_envelope(
 
 #[test]
 fn frost_club_integration_story() -> Result<()> {
+    // A 2-of-3 Gordian Club (Alice, Bob, Charlie) publishes three editions.
+    // Each edition repeats the same ritual:
+    // 1. approve plaintext,
+    // 2. derive a shared content key,
+    // 3. advance the provenance mark, and
+    // 4. sign the sealed envelope.
+    // The comments below read like a script describing why each ceremony
+    // happens and what guarantees it provides.
     provenance_mark::register_tags();
 
+    // Cast the characters: deterministic private keys give each member a
+    // signing keypair and an XID we can reference throughout the story.
     let alice_base = PrivateKeyBase::new();
     let bob_base = PrivateKeyBase::new();
     let charlie_base = PrivateKeyBase::new();
@@ -191,6 +252,7 @@ fn frost_club_integration_story() -> Result<()> {
     let charlie_doc =
         XIDDocument::new_with_private_key_base(charlie_base.clone());
 
+    // Build the initial roster; FROST keygen distributes shares to these XIDs.
     let members = vec![alice_doc.xid(), bob_doc.xid(), charlie_doc.xid()];
     let (group, participant_cores) =
         FrostGroup::new_with_trusted_dealer(2, members.clone())?;
@@ -199,15 +261,22 @@ fn frost_club_integration_story() -> Result<()> {
         BTreeMap::new();
     let mut pm_participants: BTreeMap<XID, FrostPmParticipant> =
         BTreeMap::new();
+    let mut content_participants: BTreeMap<XID, FrostContentParticipant> =
+        BTreeMap::new();
     for (xid, core) in participant_cores {
         signing_participants
             .insert(xid, FrostSigningParticipant::from_core(core.clone()));
-        pm_participants.insert(xid, FrostPmParticipant::from_core(core));
+        pm_participants
+            .insert(xid, FrostPmParticipant::from_core(core.clone()));
+        content_participants
+            .insert(xid, FrostContentParticipant::from_core(core));
     }
 
     let club_verifier = group.verifying_signing_key();
     let club_xid = XID::new(&club_verifier);
 
+    // Both publisher and independent verifier start from the same genesis mark
+    // so later verification needs only public information.
     let genesis = iso_date("2025-01-01");
     let mut publishing_chain = FrostProvenanceChain::new(
         &group,
@@ -222,7 +291,10 @@ fn frost_club_integration_story() -> Result<()> {
         genesis,
     )?;
     let mut pm_coordinator = FrostPmCoordinator::new(group.clone());
+    let mut content_coordinator = FrostContentCoordinator::new(group.clone());
 
+    // Hold onto each member's private key so the narratives later can decrypt
+    // permits corresponding to whatever quorum signed the edition.
     let mut member_privates: BTreeMap<XID, PrivateKeyBase> = BTreeMap::new();
     member_privates.insert(alice_doc.xid(), alice_base.clone());
     member_privates.insert(bob_doc.xid(), bob_base.clone());
@@ -237,6 +309,8 @@ fn frost_club_integration_story() -> Result<()> {
         ),
     ];
 
+    // Agenda for each meeting: which quorum signs, when it happens, and the
+    // plaintext agenda that will become the edition content.
     let publishing_plan = vec![
         (
             "Founding minutes signed by Alice and Bob",
@@ -260,7 +334,32 @@ fn frost_club_integration_story() -> Result<()> {
 
     let mut published_editions: Vec<Edition> = Vec::new();
 
+    // Each publishing step walks through the three ceremonies:
+    // 1. Review plaintext and derive a shared content key.
+    // 2. Advance the provenance chain with the newly approved digest.
+    // 3. Seal and FROST-sign the edition that binds everything together.
     for (label, roster, date, body) in publishing_plan {
+        // --- Ceremony 1: quorum reviews the plaintext envelope and derives the
+        // symmetric key that will encrypt it. The digest is computed over the
+        // wrapped plaintext so everyone can confirm later that the ciphertext
+        // matches what they approved.
+        let content = Envelope::new(body)
+            .add_assertion(known_values::NOTE, label)
+            .wrap();
+        let content_digest = content.digest().into_owned();
+        let content_key = frost_content_generate_key(
+            &group,
+            &mut content_coordinator,
+            &mut content_participants,
+            &roster,
+            &content_digest,
+        )?;
+        content_key.verify(&group)?;
+        assert_eq!(content_key.digest, content_digest);
+
+        // --- Ceremony 2: derive the next provenance mark using the approved
+        // digest and the same roster. The mark becomes the causal link for the
+        // edition, so it must predate the signing ceremony.
         let (mark, gamma_bytes, proof) = frost_pm_advance(
             &mut publishing_chain,
             &mut pm_coordinator,
@@ -270,11 +369,14 @@ fn frost_club_integration_story() -> Result<()> {
         )?;
         verifier_chain.verify_advance(&mark, &gamma_bytes, &proof)?;
 
-        let content =
-            Envelope::new(body).add_assertion(known_values::NOTE, label);
+        // --- Ceremony 3: seal the content with the shared key, attach the
+        // provenance mark, and have the same roster sign the edition envelope.
         let edition = Edition::new(club_xid, mark.clone(), content.clone());
-        let unsigned =
-            build_unsigned_sealed_edition(&edition, &permit_recipients)?;
+        let unsigned = build_unsigned_sealed_edition(
+            &edition,
+            &permit_recipients,
+            &content_key.key,
+        )?;
 
         let signing_coordinator = FrostSigningCoordinator::new(group.clone());
         let signed = frost_sign_envelope(
@@ -287,11 +389,16 @@ fn frost_club_integration_story() -> Result<()> {
 
         signed.verify_signature_from(&club_verifier)?;
 
+        // The signed edition should round-trip cleanly and carry the mark,
+        // permits, and encryption we expect.
         let verified = Edition::unseal(signed.clone(), &club_verifier)?;
         assert_eq!(verified.club_id, club_xid);
         assert_eq!(verified.provenance, mark);
         assert_eq!(verified.permits.len(), permit_recipients.len());
 
+        // Any member of the signing roster must be able to recover the shared
+        // symmetric key and decrypt the edition content. This proves the
+        // permits were bound to the approved digest/key pair.
         let mut decrypted_once = false;
         for permit in &verified.permits {
             if let PublicKeyPermit::Decode { sealed, .. } = permit {
@@ -305,6 +412,7 @@ fn frost_club_integration_story() -> Result<()> {
                                             "invalid content key encoding: {e}"
                                         ))
                                     })?;
+                            assert_eq!(key, content_key.key);
                             let decrypted_wrapped =
                                 verified.content.decrypt_subject(&key)?;
                             let decrypted = decrypted_wrapped.try_unwrap()?;
@@ -324,6 +432,10 @@ fn frost_club_integration_story() -> Result<()> {
         published_editions.push(verified);
     }
 
+    // The resulting editions must advance in lockstep with their provenance
+    // marks: starting from genesis and preserving order with no gaps.
+    // Curtain call: the published editions must line up with their provenance
+    // chain—genesis first, then each successive mark and signature in order.
     assert!(<Edition as ProvenanceMarkProvider>::is_sequence_valid(
         &published_editions
     ));
