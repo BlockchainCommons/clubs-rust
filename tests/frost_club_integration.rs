@@ -371,6 +371,9 @@ fn frost_club_integration_story() -> Result<()> {
 
         // --- Ceremony 3: seal the content with the shared key, attach the
         // provenance mark, and have the same roster sign the edition envelope.
+        // Note: encryption itself is done by whoever holds the plaintext
+        // (participants or trusted publisher); the coordinator never sees the
+        // cleartext, only the digest the group already approved.
         let edition = Edition::new(club_xid, mark.clone(), content.clone());
         let unsigned = build_unsigned_sealed_edition(
             &edition,
