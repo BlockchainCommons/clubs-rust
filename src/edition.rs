@@ -33,7 +33,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq)]
 pub struct Edition {
     /// The Club this edition belongs to.
-    pub club_id: XID,
+    pub club_xid: XID,
     /// Provenance mark for ordering and human-readable proof.
     pub provenance: ProvenanceMark,
     /// Plaintext content to be sealed into this edition.
@@ -50,7 +50,12 @@ impl Edition {
         provenance: ProvenanceMark,
         content: Envelope,
     ) -> Self {
-        Self { club_id, provenance, content, permits: Vec::new() }
+        Self {
+            club_xid: club_id,
+            provenance,
+            content,
+            permits: Vec::new(),
+        }
     }
 
     /// Build the unsigned, unsealed public metadata envelope for this edition.
@@ -66,7 +71,7 @@ impl Edition {
             };
 
         let mut e = subject.add_type("Edition");
-        e = e.add_assertion("club", self.club_id);
+        e = e.add_assertion("club", self.club_xid);
         e = e.add_assertion(PROVENANCE, self.provenance.clone());
         // Include decode-variant permits to maintain idempotence.
         for permit in &self.permits {
@@ -123,7 +128,7 @@ impl Edition {
 
         let mut edition = base_subject
             .add_type("Edition")
-            .add_assertion("club", self.club_id)
+            .add_assertion("club", self.club_xid)
             .add_assertion(PROVENANCE, self.provenance.clone());
 
         let mut sskr_shares: Option<Vec<Vec<Envelope>>> = None;
@@ -271,6 +276,6 @@ impl TryFrom<Envelope> for Edition {
         let content = content.ok_or_else(|| Error::msg("Missing content"))?;
         let club = club_id.ok_or_else(|| Error::msg("Missing club"))?;
 
-        Ok(Edition { club_id: club, provenance, content, permits })
+        Ok(Edition { club_xid: club, provenance, content, permits })
     }
 }

@@ -116,7 +116,7 @@ fn build_unsigned_sealed_edition(
 
     let mut envelope = base_subject
         .add_type("Edition")
-        .add_assertion("club", edition.club_id)
+        .add_assertion("club", edition.club_xid)
         .add_assertion(known_values::PROVENANCE, edition.provenance.clone());
 
     if do_encrypt {
@@ -194,7 +194,7 @@ fn frost_content_generate_key(
         coordinator.record_response(response)?;
     }
 
-    Ok(coordinator.finalize()?)
+    coordinator.finalize()
 }
 
 fn frost_sign_envelope(
@@ -237,18 +237,16 @@ fn frost_club_integration_story() -> Result<()> {
     // 2. derive a shared content key,
     // 3. advance the provenance mark, and
     // 4. sign the sealed envelope.
-    // The comments below read like a script describing why each ceremony
-    // happens and what guarantees it provides.
     provenance_mark::register_tags();
 
-    // Cast the characters: deterministic private keys give each member a
-    // signing keypair and an XID we can reference throughout the story.
+    // Each member has a private key, used for both XID and signing.
     let alice_base = PrivateKeyBase::new();
-    let bob_base = PrivateKeyBase::new();
-    let charlie_base = PrivateKeyBase::new();
-
     let alice_doc = XIDDocument::new_with_private_key_base(alice_base.clone());
+
+    let bob_base = PrivateKeyBase::new();
     let bob_doc = XIDDocument::new_with_private_key_base(bob_base.clone());
+
+    let charlie_base = PrivateKeyBase::new();
     let charlie_doc =
         XIDDocument::new_with_private_key_base(charlie_base.clone());
 
@@ -293,8 +291,10 @@ fn frost_club_integration_story() -> Result<()> {
     let mut pm_coordinator = FrostPmCoordinator::new(group.clone());
     let mut content_coordinator = FrostContentCoordinator::new(group.clone());
 
-    // Hold onto each member's private key so the narratives later can decrypt
-    // permits corresponding to whatever quorum signed the edition.
+    // Test convenience: we keep each member's private key handy so we can
+    // decrypt permits in-line. In a real deployment these keys stay in the
+    // participants' custody; the ceremony output is just the shared symmetric
+    // key and the permits, not everyone else's long-term secrets.
     let mut member_privates: BTreeMap<XID, PrivateKeyBase> = BTreeMap::new();
     member_privates.insert(alice_doc.xid(), alice_base.clone());
     member_privates.insert(bob_doc.xid(), bob_base.clone());
@@ -346,6 +346,7 @@ fn frost_club_integration_story() -> Result<()> {
         let content = Envelope::new(body)
             .add_assertion(known_values::NOTE, label)
             .wrap();
+        // println!("{}", content.format());
         let content_digest = content.digest().into_owned();
         let content_key = frost_content_generate_key(
             &group,
@@ -380,6 +381,7 @@ fn frost_club_integration_story() -> Result<()> {
             &permit_recipients,
             &content_key.key,
         )?;
+        // println!("{}", unsigned.format());
 
         let signing_coordinator = FrostSigningCoordinator::new(group.clone());
         let signed = frost_sign_envelope(
@@ -391,11 +393,12 @@ fn frost_club_integration_story() -> Result<()> {
         )?;
 
         signed.verify_signature_from(&club_verifier)?;
+        println!("{}", signed.format());
 
         // The signed edition should round-trip cleanly and carry the mark,
         // permits, and encryption we expect.
         let verified = Edition::unseal(signed.clone(), &club_verifier)?;
-        assert_eq!(verified.club_id, club_xid);
+        assert_eq!(verified.club_xid, club_xid);
         assert_eq!(verified.provenance, mark);
         assert_eq!(verified.permits.len(), permit_recipients.len());
 
@@ -437,8 +440,6 @@ fn frost_club_integration_story() -> Result<()> {
 
     // The resulting editions must advance in lockstep with their provenance
     // marks: starting from genesis and preserving order with no gaps.
-    // Curtain call: the published editions must line up with their provenance
-    // chain—genesis first, then each successive mark and signature in order.
     assert!(<Edition as ProvenanceMarkProvider>::is_sequence_valid(
         &published_editions
     ));
