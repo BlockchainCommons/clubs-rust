@@ -11,6 +11,12 @@ use crate::{
 };
 
 /// Final artefact of the content-key ceremony.
+///
+/// This wrapper is optional—publication pipelines can discard it once the
+/// quorum-derived `SymmetricKey` has been used to seal an edition. Keeping it
+/// around provides an auditable receipt (session id, digest, Γ, and DLEQ proof)
+/// so later verifiers can confirm the key truly came from the FROST quorum for
+/// the stated content digest.
 #[derive(Clone, Debug)]
 pub struct FrostContentKey {
     pub session: ARID,

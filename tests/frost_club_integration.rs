@@ -37,6 +37,7 @@ fn frost_pm_advance(
     participants: &mut BTreeMap<XID, FrostPmParticipant>,
     roster: &[XID],
     date: Date,
+    info: Option<&Digest>,
 ) -> Result<(ProvenanceMark, [u8; 33], DleqProof)> {
     if date < *chain.last_date() {
         return Err(Error::msg("provenance date must be non-decreasing"));
@@ -88,7 +89,7 @@ fn frost_pm_advance(
         chain.chain_id().to_vec(),
         chain.sequence(),
         date,
-        Option::<dcbor::CBOR>::None,
+        info.cloned(),
     )?;
 
     chain.verify_advance(&mark, &gamma_bytes, &proof)?;
@@ -291,10 +292,9 @@ fn frost_club_integration_story() -> Result<()> {
     let mut pm_coordinator = FrostPmCoordinator::new(group.clone());
     let mut content_coordinator = FrostContentCoordinator::new(group.clone());
 
-    // Test convenience: we keep each member's private key handy so we can
-    // decrypt permits in-line. In a real deployment these keys stay in the
-    // participants' custody; the ceremony output is just the shared symmetric
-    // key and the permits, not everyone else's long-term secrets.
+    // Local test convenience: keep each member's private key handy so the test
+    // can decrypt permits. In production these keys stay with the members; the
+    // only shared output is the quorum-derived symmetric key and its permits.
     let mut member_privates: BTreeMap<XID, PrivateKeyBase> = BTreeMap::new();
     member_privates.insert(alice_doc.xid(), alice_base.clone());
     member_privates.insert(bob_doc.xid(), bob_base.clone());
@@ -367,8 +367,14 @@ fn frost_club_integration_story() -> Result<()> {
             &mut pm_participants,
             &roster,
             date,
+            Some(&content_digest),
         )?;
         verifier_chain.verify_advance(&mark, &gamma_bytes, &proof)?;
+        let mark_info_digest = mark
+            .info()
+            .map(|c| Digest::try_from(c).expect("mark info digest"))
+            .expect("provenance mark should carry content digest");
+        assert_eq!(mark_info_digest, content_digest);
 
         // --- Ceremony 3: seal the content with the shared key, attach the
         // provenance mark, and have the same roster sign the edition envelope.
