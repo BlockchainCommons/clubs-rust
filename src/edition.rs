@@ -49,13 +49,19 @@ impl Edition {
         club_id: XID,
         provenance: ProvenanceMark,
         content: Envelope,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        if content.has_assertions() {
+            return Err(Error::msg(
+                "edition content must not contain assertions; wrap the envelope first",
+            ));
+        }
+
+        Ok(Self {
             club_xid: club_id,
             provenance,
             content,
             permits: Vec::new(),
-        }
+        })
     }
 
     /// Build the unsigned, unsealed public metadata envelope for this edition.
@@ -274,6 +280,11 @@ impl TryFrom<Envelope> for Edition {
         let provenance =
             provenance.ok_or_else(|| Error::msg("Missing provenance"))?;
         let content = content.ok_or_else(|| Error::msg("Missing content"))?;
+        if content.has_assertions() {
+            return Err(Error::msg(
+                "edition content must not contain assertions; wrap the envelope first",
+            ));
+        }
         let club = club_id.ok_or_else(|| Error::msg("Missing club"))?;
 
         Ok(Edition { club_xid: club, provenance, content, permits })

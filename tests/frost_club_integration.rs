@@ -381,7 +381,8 @@ fn frost_club_integration_story() -> Result<()> {
         // Note: encryption itself is done by whoever holds the plaintext
         // (participants or trusted publisher); the coordinator never sees the
         // cleartext, only the digest the group already approved.
-        let edition = Edition::new(club_xid, mark.clone(), content.clone());
+        let edition =
+            Edition::new(club_xid, mark.clone(), content.clone()).unwrap();
         let unsigned = build_unsigned_sealed_edition(
             &edition,
             &permit_recipients,

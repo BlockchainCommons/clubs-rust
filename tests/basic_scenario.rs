@@ -44,7 +44,8 @@ fn basic_scenario_alice_bob_charlie() {
     let provenance = pm_gen.next(date, Some("Club genesis edition"));
 
     // Edition 1: sealed to all three, signed by the club.
-    let edition = Edition::new(club.xid(), provenance, content.clone());
+    let edition =
+        Edition::new(club.xid(), provenance, content.clone()).unwrap();
     let recipients: Vec<PublicKeyPermit> = vec![
         PublicKeyPermit::for_member(alice.xid(), &alice_k.public_keys()),
         PublicKeyPermit::for_member(bob.xid(), &bob_k.public_keys()),
