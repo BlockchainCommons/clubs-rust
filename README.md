@@ -1,22 +1,12 @@
-# Gordian Clubs (`clubs`)
+# Gordian Clubs
 
-`clubs` is the Rust implementation of Blockchain Commons’ Gordian Clubs. It defines the data structures and helpers used to compose, seal, and verify club editions that are distributed as [Gordian Envelopes][env]. The crate is developed inside the broader [`bc-rust` workspace][bc-rust] and has **not** been published to crates.io. To experiment with it you must build from this repository (or a fork) directly.
+`clubs` is the Rust implementation of Blockchain Commons’ Gordian Clubs. It defines the data structures and helpers used to compose, seal, and verify club editions that are distributed as [Gordian Envelopes][env]. The crate has **not** yet been published to crates.io. To experiment with it you must build from the repo directly.
 
 ## Status & scope
 
 - ✳️ **Crate availability** – unpublished; intended for consumers that check out the workspace via git.
 - 🧱 **Core focus** – single-publisher clubs that ship encrypted content to members using public-key permits and/or SSKR shards.
 - 🧪 **Experimental FROST support** – the `frost/` module contains utilities for threshold Schnorr ceremonies used during provenance and signing research. The APIs will evolve.
-
-## Building & testing
-
-```bash
-# Run clippy on just this crate
-cargo clippy -p clubs --all-targets
-
-# Execute the edition-focused tests
-cargo test -p clubs
-```
 
 ## Relationship to `clubs-cli`
 
