@@ -151,7 +151,7 @@ mod tests {
         let expected = (indoc! {r#"
             '' [
                 'isA': "FrostContentSigningPackage"
-                "digest": Digest(8e9e41e6)
+                "digest": Digest(50d858e0)
                 "hPoint": Bytes(33)
                 "lambda": '' [
                     'isA': "FrostContentLambdaFactor"

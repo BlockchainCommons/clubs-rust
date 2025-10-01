@@ -33,7 +33,11 @@ fn basic_scenario_alice_bob_charlie() {
 
     // First edition content.
     let content = Envelope::new("Welcome to the club!")
-        .add_assertion(NAME, "Gordian Test Club");
+        .add_assertion(NAME, "Gordian Test Club")
+        .wrap();
+
+    // Wrap content before getting digest
+    let content_digest = content.digest().into_owned();
 
     // Provenance (deterministic).
     let mut pm_gen = ProvenanceMarkGenerator::new_with_passphrase(
@@ -41,7 +45,7 @@ fn basic_scenario_alice_bob_charlie() {
         "ClubSeed",
     );
     let date = Date::from_string("2025-01-01").unwrap();
-    let provenance = pm_gen.next(date, Some("Club genesis edition"));
+    let provenance = pm_gen.next(date, Some(content_digest));
 
     // Edition 1: sealed to all three, signed by the club.
     let edition =
@@ -86,7 +90,7 @@ fn basic_scenario_alice_bob_charlie() {
                     'holder': XID(74107ca5)
                 ]
                 "club": XID(02dca4b9)
-                'provenance': ProvenanceMark(ef7c82c8)
+                'provenance': ProvenanceMark(e67182ae)
             ]
         } [
             'signed': Signature
@@ -127,7 +131,7 @@ fn basic_scenario_alice_bob_charlie() {
                 'holder': XID(74107ca5)
             ]
             "club": XID(02dca4b9)
-            'provenance': ProvenanceMark(ef7c82c8)
+            'provenance': ProvenanceMark(e67182ae)
         ]
     "#}).trim();
     assert_eq!(roundtrip_env.format(), expected_rt);

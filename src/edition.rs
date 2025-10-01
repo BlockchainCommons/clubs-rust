@@ -56,6 +56,18 @@ impl Edition {
             ));
         }
 
+        // Validate that provenance info matches content digest
+        if let Some(info_cbor) = provenance.info() {
+            let info_digest = Digest::try_from_cbor(&info_cbor)
+                .map_err(|_| Error::msg("Invalid digest in provenance info"))?;
+            let content_digest = content.digest();
+            if info_digest != content_digest.into_owned() {
+                return Err(Error::msg(
+                    "Provenance mark info digest does not match content digest",
+                ));
+            }
+        }
+
         Ok(Self {
             club_xid: club_id,
             provenance,
@@ -187,12 +199,16 @@ impl Edition {
 }
 
 impl ProvenanceMarkProvider for Edition {
-    fn provenance_mark(&self) -> &ProvenanceMark { &self.provenance }
+    fn provenance_mark(&self) -> &ProvenanceMark {
+        &self.provenance
+    }
 }
 
 // EnvelopeEncodable via Into<Envelope>
 impl From<Edition> for Envelope {
-    fn from(value: Edition) -> Self { value.to_unsigned_envelope() }
+    fn from(value: Edition) -> Self {
+        value.to_unsigned_envelope()
+    }
 }
 
 // EnvelopeDecodable via TryFrom<Envelope>
