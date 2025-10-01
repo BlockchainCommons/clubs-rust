@@ -2,6 +2,20 @@
 name = "clubs"
 version = "0.1.0"
 edition = "2024"
+description = "Gordian Clubs for Rust."
+authors = ["Blockchain Commons"]
+repository = "https://github.com/BlockchainCommons/clubs-rust"
+readme = "README.md"
+license = "BSD-2-Clause-Patent"
+documentation = "https://docs.rs/clubs"
+keywords = [
+    "encoding",
+    "cbor",
+    "binary",
+    "format",
+    "publishing",
+] # Up to five
+categories = ["data-structures", "encoding"] # https://crates.io/category_slugs
 
 [dependencies]
 provenance-mark = "^0.13.0"
