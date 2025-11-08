@@ -5,7 +5,7 @@ use bc_components::{
     XID, XIDProvider,
 };
 use bc_envelope::prelude::*;
-use bc_xid::XIDDocument;
+use bc_xid::{GenesisMarkOptions, InceptionKeyOptions, XIDDocument};
 use clubs::{
     Error, Result,
     edition::Edition,
@@ -242,15 +242,22 @@ fn frost_club_integration_story() -> Result<()> {
 
     // Each member has a private key, used for both XID and signing.
     let alice_base = PrivateKeyBase::new();
-    let alice_doc = XIDDocument::new_with_private_key_base(alice_base.clone());
+    let alice_doc = XIDDocument::new(
+        InceptionKeyOptions::PrivateKeyBase(alice_base.clone()),
+        GenesisMarkOptions::None,
+    );
 
     let bob_base = PrivateKeyBase::new();
-    let bob_doc = XIDDocument::new_with_private_key_base(bob_base.clone());
+    let bob_doc = XIDDocument::new(
+        InceptionKeyOptions::PrivateKeyBase(bob_base.clone()),
+        GenesisMarkOptions::None,
+    );
 
     let charlie_base = PrivateKeyBase::new();
-    let charlie_doc =
-        XIDDocument::new_with_private_key_base(charlie_base.clone());
-
+    let charlie_doc = XIDDocument::new(
+        InceptionKeyOptions::PrivateKeyBase(charlie_base.clone()),
+        GenesisMarkOptions::None,
+    );
     // Build the initial roster; FROST keygen distributes shares to these XIDs.
     let members = vec![alice_doc.xid(), bob_doc.xid(), charlie_doc.xid()];
     let (group, participant_cores) =

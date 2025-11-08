@@ -199,16 +199,12 @@ impl Edition {
 }
 
 impl ProvenanceMarkProvider for Edition {
-    fn provenance_mark(&self) -> &ProvenanceMark {
-        &self.provenance
-    }
+    fn provenance_mark(&self) -> &ProvenanceMark { &self.provenance }
 }
 
 // EnvelopeEncodable via Into<Envelope>
 impl From<Edition> for Envelope {
-    fn from(value: Edition) -> Self {
-        value.to_unsigned_envelope()
-    }
+    fn from(value: Edition) -> Self { value.to_unsigned_envelope() }
 }
 
 // EnvelopeDecodable via TryFrom<Envelope>

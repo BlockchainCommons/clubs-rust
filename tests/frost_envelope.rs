@@ -1,6 +1,6 @@
 use bc_components::XIDProvider;
-use bc_envelope::{PrivateKeyBase, prelude::*};
-use bc_xid::XIDDocument;
+use bc_envelope::prelude::*;
+use bc_xid::{GenesisMarkOptions, InceptionKeyOptions, XIDDocument};
 use clubs::frost::{
     FrostGroup, FrostSigningCoordinator, FrostSigningParticipant,
 };
@@ -9,11 +9,18 @@ use indoc::indoc;
 #[test]
 fn frost_two_of_three_signs_envelope_and_verify() {
     // --- Create three XIDDocuments ---
-    let alice_doc =
-        XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
-    let bob_doc = XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
-    let charlie_doc =
-        XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
+    let alice_doc = XIDDocument::new(
+        InceptionKeyOptions::Default,
+        GenesisMarkOptions::None,
+    );
+    let bob_doc = XIDDocument::new(
+        InceptionKeyOptions::Default,
+        GenesisMarkOptions::None,
+    );
+    let charlie_doc = XIDDocument::new(
+        InceptionKeyOptions::Default,
+        GenesisMarkOptions::None,
+    );
 
     // --- Prepare an Envelope, wrapped so the signature covers the whole
     // structure ---

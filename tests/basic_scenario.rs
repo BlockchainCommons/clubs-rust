@@ -3,7 +3,7 @@ use bc_components::{
     XIDProvider,
 };
 use bc_envelope::prelude::*;
-use bc_xid::XIDDocument;
+use bc_xid::{GenesisMarkOptions, InceptionKeyOptions, XIDDocument};
 use clubs::{edition::Edition, public_key_permit::PublicKeyPermit};
 use indoc::indoc;
 use known_values::NAME;
@@ -23,13 +23,24 @@ fn basic_scenario_alice_bob_charlie() {
     let bob_k = fixed_key(0xB2);
     let charlie_k = fixed_key(0xC3);
 
-    let alice = XIDDocument::new_with_private_key_base(alice_k.clone());
-    let bob = XIDDocument::new_with_private_key_base(bob_k.clone());
-    let charlie = XIDDocument::new_with_private_key_base(charlie_k.clone());
-
+    let alice = XIDDocument::new(
+        InceptionKeyOptions::PrivateKeyBase(alice_k.clone()),
+        GenesisMarkOptions::None,
+    );
+    let bob = XIDDocument::new(
+        InceptionKeyOptions::PrivateKeyBase(bob_k.clone()),
+        GenesisMarkOptions::None,
+    );
+    let charlie = XIDDocument::new(
+        InceptionKeyOptions::PrivateKeyBase(charlie_k.clone()),
+        GenesisMarkOptions::None,
+    );
     // New club (its own XIDDocument).
     let club_k = fixed_key(0xD4);
-    let club = XIDDocument::new_with_private_key_base(club_k.clone());
+    let club = XIDDocument::new(
+        InceptionKeyOptions::PrivateKeyBase(club_k.clone()),
+        GenesisMarkOptions::None,
+    );
 
     // First edition content.
     let content = Envelope::new("Welcome to the club!")

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use bc_components::{PrivateKeyBase, XID, XIDProvider};
-use bc_xid::XIDDocument;
+use bc_components::{XID, XIDProvider};
+use bc_xid::{GenesisMarkOptions, InceptionKeyOptions, XIDDocument};
 use clubs::frost::{
     FrostGroup,
     pm::{
@@ -98,11 +98,18 @@ fn run_ceremony(
 fn frost_provenance_story() -> clubs::Result<()> {
     // Provision three club members with their own XIDs so they can hold FROST
     // signing shares and appear as independent actors in the ceremony.
-    let alice_doc =
-        XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
-    let bob_doc = XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
-    let charlie_doc =
-        XIDDocument::new_with_private_key_base(PrivateKeyBase::new());
+    let alice_doc = XIDDocument::new(
+        InceptionKeyOptions::Default,
+        GenesisMarkOptions::None,
+    );
+    let bob_doc = XIDDocument::new(
+        InceptionKeyOptions::Default,
+        GenesisMarkOptions::None,
+    );
+    let charlie_doc = XIDDocument::new(
+        InceptionKeyOptions::Default,
+        GenesisMarkOptions::None,
+    );
 
     // Establish a 2-of-3 threshold group, mirroring the quorum size we expect
     // for provenance publishing.
