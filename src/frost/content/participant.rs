@@ -51,12 +51,12 @@ impl FrostContentParticipant {
         session: ARID,
         h_point: &ProjectivePoint,
     ) -> Result<FrostContentCommitment> {
-        if let Some(existing) = self.session {
-            if existing != session {
-                return Err(Error::msg(
-                    "participant active in different content session",
-                ));
-            }
+        if let Some(existing) = self.session
+            && existing != session
+        {
+            return Err(Error::msg(
+                "participant active in different content session",
+            ));
         }
 
         let mut rng = OsRng;

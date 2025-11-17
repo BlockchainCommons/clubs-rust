@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use bc_components::{Digest, PrivateKeyBase, XIDProvider};
-use bc_xid::{GenesisMarkOptions, InceptionKeyOptions, XIDDocument};
+use bc_xid::{XIDGenesisMarkOptions, XIDInceptionKeyOptions, XIDDocument};
 use clubs::frost::{
     FrostGroup, FrostParticipantCore,
     content::{
@@ -90,8 +90,8 @@ fn content_key_deterministic_and_roster_invariant() {
     for _ in 0..5 {
         let base = PrivateKeyBase::new();
         let doc = XIDDocument::new(
-            InceptionKeyOptions::PrivateKeyBase(base),
-            GenesisMarkOptions::None,
+            XIDInceptionKeyOptions::PrivateKeyBase(base),
+            XIDGenesisMarkOptions::None,
         );
         members.push(doc.xid());
     }

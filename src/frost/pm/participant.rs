@@ -53,12 +53,12 @@ impl FrostPmParticipant {
         session: ARID,
         h_point: &ProjectivePoint,
     ) -> Result<FrostPmCommitment> {
-        if let Some(existing) = self.session {
-            if existing != session {
-                return Err(Error::msg(
-                    "participant active in different pm session",
-                ));
-            }
+        if let Some(existing) = self.session
+            && existing != session
+        {
+            return Err(Error::msg(
+                "participant active in different pm session",
+            ));
         }
 
         let mut rng = OsRng;

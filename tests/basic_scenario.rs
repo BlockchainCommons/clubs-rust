@@ -3,7 +3,7 @@ use bc_components::{
     XIDProvider,
 };
 use bc_envelope::prelude::*;
-use bc_xid::{GenesisMarkOptions, InceptionKeyOptions, XIDDocument};
+use bc_xid::{XIDDocument, XIDGenesisMarkOptions, XIDInceptionKeyOptions};
 use clubs::{edition::Edition, public_key_permit::PublicKeyPermit};
 use indoc::indoc;
 use known_values::NAME;
@@ -24,22 +24,22 @@ fn basic_scenario_alice_bob_charlie() {
     let charlie_k = fixed_key(0xC3);
 
     let alice = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(alice_k.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(alice_k.clone()),
+        XIDGenesisMarkOptions::None,
     );
     let bob = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(bob_k.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(bob_k.clone()),
+        XIDGenesisMarkOptions::None,
     );
     let charlie = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(charlie_k.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(charlie_k.clone()),
+        XIDGenesisMarkOptions::None,
     );
     // New club (its own XIDDocument).
     let club_k = fixed_key(0xD4);
     let club = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(club_k.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(club_k.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     // First edition content.
@@ -155,13 +155,12 @@ fn basic_scenario_alice_bob_charlie() {
     // Member decrypts: Alice unseals and reads content
     let mut content_key: Option<SymmetricKey> = None;
     for permit in &edition_rt.permits {
-        if let PublicKeyPermit::Decode { sealed, .. } = permit {
-            if let Ok(plaintext) = sealed.decrypt(&alice_k) {
-                let key =
-                    SymmetricKey::from_tagged_cbor_data(plaintext).unwrap();
-                content_key = Some(key);
-                break;
-            }
+        if let PublicKeyPermit::Decode { sealed, .. } = permit
+            && let Ok(plaintext) = sealed.decrypt(&alice_k)
+        {
+            let key = SymmetricKey::from_tagged_cbor_data(plaintext).unwrap();
+            content_key = Some(key);
+            break;
         }
     }
     let content_key =

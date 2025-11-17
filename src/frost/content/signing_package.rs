@@ -83,33 +83,29 @@ impl TryFrom<Envelope> for FrostContentSigningPackage {
         let mut lambda_factors: BTreeMap<XID, Scalar> = BTreeMap::new();
         for assertion in envelope.assertions() {
             let pred_env = assertion.try_predicate()?;
-            if let Ok(pred_leaf) = pred_env.try_leaf() {
-                if let Ok(name) =
+            if let Ok(pred_leaf) = pred_env.try_leaf()
+                && let Ok(name) =
                     <String as TryFrom<_>>::try_from(pred_leaf.clone())
-                {
-                    if name == "lambda" {
-                        let obj_env = assertion.try_object()?;
-                        obj_env
-                            .check_type_envelope("FrostContentLambdaFactor")?;
-                        let obj_subj = obj_env.subject();
-                        let obj_kv = obj_subj.try_known_value()?;
-                        if obj_kv.value() != known_values::UNIT.value() {
-                            return Err(Error::msg(
-                                "unexpected subject for FrostContentLambdaFactor",
-                            ));
-                        }
-                        let xid: XID =
-                            obj_env.try_object_for_predicate(HOLDER)?;
-                        let scalar_bs: ByteString =
-                            obj_env.try_object_for_predicate("scalar")?;
-                        let scalar_vec: Vec<u8> = scalar_bs.into();
-                        let scalar_arr: [u8; 32] = scalar_vec
-                            .try_into()
-                            .map_err(|_| Error::msg("invalid scalar length"))?;
-                        let scalar = scalar_from_be_bytes(&scalar_arr)?;
-                        lambda_factors.insert(xid, scalar);
-                    }
+                && name == "lambda"
+            {
+                let obj_env = assertion.try_object()?;
+                obj_env.check_type_envelope("FrostContentLambdaFactor")?;
+                let obj_subj = obj_env.subject();
+                let obj_kv = obj_subj.try_known_value()?;
+                if obj_kv.value() != known_values::UNIT.value() {
+                    return Err(Error::msg(
+                        "unexpected subject for FrostContentLambdaFactor",
+                    ));
                 }
+                let xid: XID = obj_env.try_object_for_predicate(HOLDER)?;
+                let scalar_bs: ByteString =
+                    obj_env.try_object_for_predicate("scalar")?;
+                let scalar_vec: Vec<u8> = scalar_bs.into();
+                let scalar_arr: [u8; 32] = scalar_vec
+                    .try_into()
+                    .map_err(|_| Error::msg("invalid scalar length"))?;
+                let scalar = scalar_from_be_bytes(&scalar_arr)?;
+                lambda_factors.insert(xid, scalar);
             }
         }
         Ok(Self { session, digest, h_point, lambda_factors })

@@ -54,15 +54,13 @@ impl TryFrom<Envelope> for FrostSigningPackage {
         let mut commitments: Vec<FrostSigningCommitment> = Vec::new();
         for assertion in envelope.assertions() {
             let pred_env = assertion.try_predicate()?;
-            if let Ok(pred) = pred_env.try_leaf() {
-                if let Ok(name) = <String as TryFrom<_>>::try_from(pred.clone())
-                {
-                    if name == "commitment" {
-                        let obj_env = assertion.try_object()?;
-                        let c = FrostSigningCommitment::try_from(obj_env)?;
-                        commitments.push(c);
-                    }
-                }
+            if let Ok(pred) = pred_env.try_leaf()
+                && let Ok(name) = <String as TryFrom<_>>::try_from(pred.clone())
+                && name == "commitment"
+            {
+                let obj_env = assertion.try_object()?;
+                let c = FrostSigningCommitment::try_from(obj_env)?;
+                commitments.push(c);
             }
         }
         Ok(FrostSigningPackage { session, message, commitments })

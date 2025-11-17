@@ -19,7 +19,7 @@ use bc_components::{
     SSKRSpec, SymmetricKey, XIDProvider,
 };
 use bc_envelope::prelude::*;
-use bc_xid::{GenesisMarkOptions, InceptionKeyOptions, XIDDocument};
+use bc_xid::{XIDGenesisMarkOptions, XIDInceptionKeyOptions, XIDDocument};
 use clubs::{edition::Edition, public_key_permit::PublicKeyPermit};
 use dcbor::Date;
 use provenance_mark::{
@@ -42,23 +42,23 @@ fn test_complete_demo_workflow() {
     // Publisher keys
     let publisher_prvkeys = fixed_key(0xAA);
     let publisher_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     // Member keys (Alice and Bob)
     let alice_prvkeys = fixed_key(0xA1);
     let alice_pubkeys = alice_prvkeys.public_keys();
     let alice_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(alice_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(alice_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     let bob_prvkeys = fixed_key(0xB0);
     let bob_pubkeys = bob_prvkeys.public_keys();
     let bob_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(bob_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(bob_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
     // ═══════════════════════════════════════════════════════════════════════
     // STEP 2: Create Genesis Edition Content
@@ -171,14 +171,13 @@ fn test_complete_demo_workflow() {
     for permit in &edition_rt.permits {
         if let PublicKeyPermit::Decode { sealed, member_xid } = permit {
             // Check if this is Alice's permit
-            if member_xid == &Some(alice_xid.xid()) {
-                if let Ok(plaintext) = sealed.decrypt(&alice_prvkeys) {
+            if member_xid == &Some(alice_xid.xid())
+                && let Ok(plaintext) = sealed.decrypt(&alice_prvkeys) {
                     let key =
                         SymmetricKey::from_tagged_cbor_data(plaintext).unwrap();
                     content_key = Some(key);
                     break;
                 }
-            }
         }
     }
 
@@ -323,8 +322,8 @@ fn test_invalid_edition_content() {
 
     let publisher_prvkeys = fixed_key(0xCC);
     let publisher_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(publisher_prvkeys),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(publisher_prvkeys),
+        XIDGenesisMarkOptions::None,
     );
 
     let mut pm_gen = ProvenanceMarkGenerator::new_with_passphrase(
@@ -348,15 +347,15 @@ fn test_edition_without_sskr() {
 
     let publisher_prvkeys = fixed_key(0xDD);
     let publisher_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     let alice_prvkeys = fixed_key(0xA2);
     let alice_pubkeys = alice_prvkeys.public_keys();
     let alice_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(alice_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(alice_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     let content = Envelope::new("Test content").wrap();
@@ -398,15 +397,15 @@ fn test_wrong_permit_key() {
 
     let publisher_prvkeys = fixed_key(0xEE);
     let publisher_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     let alice_prvkeys = fixed_key(0xA3);
     let alice_pubkeys = alice_prvkeys.public_keys();
     let alice_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(alice_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(alice_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     // Bob tries to decrypt Alice's permit
@@ -437,11 +436,10 @@ fn test_wrong_permit_key() {
     // Bob should fail to decrypt Alice's permit
     let mut bob_succeeded = false;
     for permit in &edition_rt.permits {
-        if let PublicKeyPermit::Decode { sealed, .. } = permit {
-            if sealed.decrypt(&bob_prvkeys).is_ok() {
+        if let PublicKeyPermit::Decode { sealed, .. } = permit
+            && sealed.decrypt(&bob_prvkeys).is_ok() {
                 bob_succeeded = true;
             }
-        }
     }
 
     assert!(!bob_succeeded, "Bob should not decrypt Alice's permit");
@@ -453,8 +451,8 @@ fn test_wrong_signature_verification() {
 
     let publisher_prvkeys = fixed_key(0xFF);
     let publisher_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     // Different key for verification
@@ -491,8 +489,8 @@ fn test_multiple_sskr_groups() {
 
     let publisher_prvkeys = fixed_key(0x11);
     let publisher_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     let content = Envelope::new("Multi-group content").wrap();
@@ -546,8 +544,8 @@ fn test_provenance_info_matches_content_digest() {
 
     let publisher_prvkeys = fixed_key(0x22);
     let publisher_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     let content = Envelope::new("Test content").wrap();
@@ -591,8 +589,8 @@ fn test_provenance_info_mismatch_content_digest() {
 
     let publisher_prvkeys = fixed_key(0x23);
     let publisher_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     let content = Envelope::new("Test content").wrap();
@@ -645,8 +643,8 @@ fn test_provenance_without_info_field() {
 
     let publisher_prvkeys = fixed_key(0x24);
     let publisher_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     let content = Envelope::new("Test content").wrap();
@@ -684,8 +682,8 @@ fn test_edition_sequence_with_digest_validation() {
 
     let publisher_prvkeys = fixed_key(0x25);
     let publisher_xid = XIDDocument::new(
-        InceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
-        GenesisMarkOptions::None,
+        XIDInceptionKeyOptions::PrivateKeyBase(publisher_prvkeys.clone()),
+        XIDGenesisMarkOptions::None,
     );
 
     let mut pm_gen = ProvenanceMarkGenerator::new_with_passphrase(
