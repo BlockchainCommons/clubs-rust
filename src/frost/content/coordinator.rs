@@ -102,7 +102,7 @@ impl FrostContentCoordinator {
         Ok(())
     }
 
-    fn message_to_curve(&self, digest: &Digest) -> Result<ProjectivePoint> {
+    fn message_to_curve(&self, digest: Digest) -> Result<ProjectivePoint> {
         let mut msg = Vec::with_capacity(
             CONTENT_MESSAGE_PREFIX.len() + digest.as_bytes().len(),
         );
@@ -114,7 +114,7 @@ impl FrostContentCoordinator {
     pub fn signing_package_for(
         &mut self,
         roster: &[XID],
-        digest: &Digest,
+        digest: Digest,
     ) -> Result<FrostContentSigningPackage> {
         let roster_set: BTreeSet<XID> = roster.iter().copied().collect();
         if roster_set.len() != roster.len() {
@@ -134,7 +134,7 @@ impl FrostContentCoordinator {
 
         self.roster = Some(roster.to_vec());
         self.lambda_factors = Some(lambda_factors.clone());
-        self.digest = Some(digest.clone());
+        self.digest = Some(digest);
         self.h_point = Some(h_point);
         self.gamma_shares.clear();
         self.responses.clear();
@@ -145,7 +145,7 @@ impl FrostContentCoordinator {
 
         Ok(FrostContentSigningPackage {
             session: self.session_id,
-            digest: digest.clone(),
+            digest,
             h_point,
             lambda_factors,
         })
@@ -279,7 +279,6 @@ impl FrostContentCoordinator {
 
         let digest = self
             .digest
-            .clone()
             .ok_or_else(|| Error::msg("signing package not yet prepared"))?;
 
         let challenge = self.challenge()?;

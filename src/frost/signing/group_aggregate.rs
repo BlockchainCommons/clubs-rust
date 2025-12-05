@@ -20,7 +20,7 @@ impl FrostGroup {
         // Signatures attach as assertions on the subject; derive message
         let subj = envelope.subject();
         let subject_digest = subj.digest();
-        let _message: &[u8] = subject_digest.as_ref().as_ref();
+        let _message: &[u8] = subject_digest.as_ref();
 
         // Convert signature
         let signature = Signature::schnorr_from_data(*schnorr_sig64);
@@ -74,7 +74,7 @@ impl FrostGroup {
         // Derive message digest from the package's message Envelope subject
         let subj_env = signing_package_g.message.subject();
         let msg_digest = subj_env.digest();
-        let msg_bytes: &[u8] = msg_digest.as_ref().as_ref();
+        let msg_bytes: &[u8] = msg_digest.as_ref();
         let signing_package = frost_secp256k1_tr::SigningPackage::new(
             frost_commitments,
             msg_bytes,

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use bc_components::{XID, XIDProvider};
-use bc_xid::{XIDGenesisMarkOptions, XIDInceptionKeyOptions, XIDDocument};
+use bc_xid::{XIDDocument, XIDGenesisMarkOptions, XIDInceptionKeyOptions};
 use clubs::frost::{
     FrostGroup,
     pm::{
@@ -135,7 +135,7 @@ fn frost_provenance_story() -> clubs::Result<()> {
         &group,
         ProvenanceMarkResolution::Quartile,
         b"Gordian Club Minutes",
-        genesis.clone(),
+        genesis,
     )?;
     // The verifier chain simulates an external observer that only consumes the
     // published artifacts; keeping it separate demonstrates that verification

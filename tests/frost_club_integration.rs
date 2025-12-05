@@ -37,7 +37,7 @@ fn frost_pm_advance(
     participants: &mut BTreeMap<XID, FrostPmParticipant>,
     roster: &[XID],
     date: Date,
-    info: Option<&Digest>,
+    info: Option<Digest>,
 ) -> Result<(ProvenanceMark, [u8; 33], DleqProof)> {
     if date < *chain.last_date() {
         return Err(Error::msg("provenance date must be non-decreasing"));
@@ -89,7 +89,7 @@ fn frost_pm_advance(
         chain.chain_id().to_vec(),
         chain.sequence(),
         date,
-        info.cloned(),
+        info,
     )?;
 
     chain.verify_advance(&mark, &gamma_bytes, &proof)?;
@@ -157,7 +157,7 @@ fn frost_content_generate_key(
     coordinator: &mut FrostContentCoordinator,
     participants: &mut BTreeMap<XID, FrostContentParticipant>,
     roster: &[XID],
-    digest: &Digest,
+    digest: Digest,
 ) -> Result<FrostContentKey> {
     coordinator.start_session();
     let session = coordinator.session_id();
@@ -288,7 +288,7 @@ fn frost_club_integration_story() -> Result<()> {
         &group,
         ProvenanceMarkResolution::Quartile,
         b"Gordian Club Minutes",
-        genesis.clone(),
+        genesis,
     )?;
     let mut verifier_chain = FrostProvenanceChain::new(
         &group,
@@ -354,13 +354,13 @@ fn frost_club_integration_story() -> Result<()> {
             .add_assertion(known_values::NOTE, label)
             .wrap();
         // println!("{}", content.format());
-        let content_digest = content.digest().into_owned();
+        let content_digest = content.digest();
         let content_key = frost_content_generate_key(
             &group,
             &mut content_coordinator,
             &mut content_participants,
             &roster,
-            &content_digest,
+            content_digest,
         )?;
         content_key.verify(&group)?;
         assert_eq!(content_key.digest, content_digest);
@@ -374,7 +374,7 @@ fn frost_club_integration_story() -> Result<()> {
             &mut pm_participants,
             &roster,
             date,
-            Some(&content_digest),
+            Some(content_digest),
         )?;
         verifier_chain.verify_advance(&mark, &gamma_bytes, &proof)?;
         let mark_info_digest = mark

@@ -44,7 +44,7 @@ impl TryFrom<Envelope> for FrostPmResponseShare {
     type Error = Error;
 
     fn try_from(envelope: Envelope) -> Result<Self> {
-        envelope.check_type_envelope("FrostPmResponseShare")?;
+        envelope.check_type("FrostPmResponseShare")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {

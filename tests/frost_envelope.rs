@@ -1,6 +1,6 @@
 use bc_components::XIDProvider;
 use bc_envelope::prelude::*;
-use bc_xid::{XIDGenesisMarkOptions, XIDInceptionKeyOptions, XIDDocument};
+use bc_xid::{XIDDocument, XIDGenesisMarkOptions, XIDInceptionKeyOptions};
 use clubs::frost::{
     FrostGroup, FrostSigningCoordinator, FrostSigningParticipant,
 };

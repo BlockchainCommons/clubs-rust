@@ -1,7 +1,7 @@
 use bc_components::{ARID, XID};
 use frost_secp256k1_tr as frost;
+use frost::rand_core::OsRng;
 use k256::{ProjectivePoint, Scalar};
-use rand_core::OsRng;
 
 use crate::{
     Error, Result,

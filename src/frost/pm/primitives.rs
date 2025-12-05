@@ -5,6 +5,7 @@ use core::{convert::TryInto, ops::Add};
 use bc_envelope::prelude::*;
 use frost_secp256k1_tr as frost;
 use frost_secp256k1_tr::Group;
+use frost::rand_core::OsRng;
 use k256::{
     AffinePoint, EncodedPoint, FieldBytes, ProjectivePoint, Scalar, Secp256k1,
     elliptic_curve::{
@@ -13,7 +14,6 @@ use k256::{
         sec1::{FromEncodedPoint, ToEncodedPoint},
     },
 };
-use rand_core::OsRng;
 use sha2::{Digest, Sha256};
 
 use crate::Error;
@@ -93,7 +93,7 @@ impl TryFrom<Envelope> for DleqProof {
     type Error = Error;
 
     fn try_from(envelope: Envelope) -> crate::Result<Self> {
-        envelope.check_type_envelope("FrostPmDleqProof")?;
+        envelope.check_type("FrostPmDleqProof")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {

@@ -36,7 +36,7 @@ impl From<FrostContentSigningPackage> for Envelope {
         let mut e = Envelope::new(known_values::UNIT);
         e = e.add_type("FrostContentSigningPackage");
         e = e.add_assertion("session", value.session);
-        e = e.add_assertion("digest", value.digest.clone());
+        e = e.add_assertion("digest", value.digest);
         let h_bytes = point_bytes(&value.h_point)
             .expect("valid projective point for FrostContentSigningPackage");
         e = e.add_assertion(
@@ -64,7 +64,7 @@ impl TryFrom<Envelope> for FrostContentSigningPackage {
     type Error = Error;
 
     fn try_from(envelope: Envelope) -> Result<Self> {
-        envelope.check_type_envelope("FrostContentSigningPackage")?;
+        envelope.check_type("FrostContentSigningPackage")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
@@ -89,7 +89,7 @@ impl TryFrom<Envelope> for FrostContentSigningPackage {
                 && name == "lambda"
             {
                 let obj_env = assertion.try_object()?;
-                obj_env.check_type_envelope("FrostContentLambdaFactor")?;
+                obj_env.check_type("FrostContentLambdaFactor")?;
                 let obj_subj = obj_env.subject();
                 let obj_kv = obj_subj.try_known_value()?;
                 if obj_kv.value() != known_values::UNIT.value() {
@@ -138,7 +138,7 @@ mod tests {
 
         let package = FrostContentSigningPackage {
             session,
-            digest: digest.clone(),
+            digest,
             h_point,
             lambda_factors,
         };

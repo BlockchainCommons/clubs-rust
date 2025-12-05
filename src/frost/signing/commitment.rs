@@ -57,7 +57,7 @@ impl From<FrostSigningCommitment> for Envelope {
 impl TryFrom<Envelope> for FrostSigningCommitment {
     type Error = Error;
     fn try_from(envelope: Envelope) -> Result<Self> {
-        envelope.check_type_envelope("FrostSigningCommitment")?;
+        envelope.check_type("FrostSigningCommitment")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {

@@ -127,7 +127,7 @@ impl FrostProvenanceChain {
         if mark.key() != self.last_key {
             return Err(Error::msg("advance key mismatch"));
         }
-        if mark.date() < &self.last_date {
+        if mark.date() < self.last_date {
             return Err(Error::msg("advance date regresses"));
         }
 
@@ -152,7 +152,7 @@ impl FrostProvenanceChain {
             next_key_vec.clone(),
             self.chain_id.clone(),
             self.sequence,
-            mark.date().clone(),
+            mark.date(),
             mark.info(),
         )?;
         if rebuilt != *mark {
@@ -163,7 +163,7 @@ impl FrostProvenanceChain {
         self.ratchet_state = ratchet_state(&self.ratchet_state, &expanded_key);
         self.last_key = next_key_vec;
         self.sequence += 1;
-        self.last_date = mark.date().clone();
+        self.last_date = mark.date();
         Ok(())
     }
 }

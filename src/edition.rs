@@ -61,7 +61,7 @@ impl Edition {
             let info_digest = Digest::try_from_cbor(&info_cbor)
                 .map_err(|_| Error::msg("Invalid digest in provenance info"))?;
             let content_digest = content.digest();
-            if info_digest != content_digest.into_owned() {
+            if info_digest != content_digest {
                 return Err(Error::msg(
                     "Provenance mark info digest does not match content digest",
                 ));
@@ -110,7 +110,7 @@ impl Edition {
     /// Compute a stable digest for identifying this edition's public metadata
     /// before sealing content. Useful for binding permits (AAD).
     pub fn provisional_id(&self) -> Digest {
-        self.to_unsigned_envelope().digest().into_owned()
+        self.to_unsigned_envelope().digest()
     }
 
     /// Seal the content with optional permits (public-key and/or SSKR), and
@@ -212,7 +212,7 @@ impl TryFrom<Envelope> for Edition {
     type Error = Error;
 
     fn try_from(envelope: Envelope) -> Result<Self> {
-        envelope.check_type_envelope("Edition")?;
+        envelope.check_type("Edition")?;
 
         let subject = envelope.subject();
         let content: Option<Envelope> = if subject.is_wrapped() {

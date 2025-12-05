@@ -47,7 +47,7 @@ impl From<FrostContentKey> for Envelope {
         let mut e = Envelope::new(known_values::UNIT);
         e = e.add_type("FrostContentKeyResult");
         e = e.add_assertion("session", value.session);
-        e = e.add_assertion("digest", value.digest.clone());
+        e = e.add_assertion("digest", value.digest);
         e = e.add_assertion(
             "gamma",
             CBOR::from(ByteString::from(value.gamma_bytes.to_vec())),
@@ -65,7 +65,7 @@ impl TryFrom<Envelope> for FrostContentKey {
     type Error = Error;
 
     fn try_from(envelope: Envelope) -> Result<Self> {
-        envelope.check_type_envelope("FrostContentKeyResult")?;
+        envelope.check_type("FrostContentKeyResult")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
@@ -112,13 +112,8 @@ mod tests {
         };
         let gamma_bytes =
             crate::frost::pm::primitives::point_bytes(&gamma_point).unwrap();
-        let result = FrostContentKey {
-            session,
-            digest: digest.clone(),
-            key,
-            gamma_bytes,
-            proof,
-        };
+        let result =
+            FrostContentKey { session, digest, key, gamma_bytes, proof };
 
         let env: Envelope = result.clone().into();
         let rt = FrostContentKey::try_from(env).unwrap();

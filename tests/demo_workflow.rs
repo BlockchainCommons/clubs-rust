@@ -19,7 +19,7 @@ use bc_components::{
     SSKRSpec, SymmetricKey, XIDProvider,
 };
 use bc_envelope::prelude::*;
-use bc_xid::{XIDGenesisMarkOptions, XIDInceptionKeyOptions, XIDDocument};
+use bc_xid::{XIDDocument, XIDGenesisMarkOptions, XIDInceptionKeyOptions};
 use clubs::{edition::Edition, public_key_permit::PublicKeyPermit};
 use dcbor::Date;
 use provenance_mark::{
@@ -74,7 +74,7 @@ fn test_complete_demo_workflow() {
     assert!(content_wrapped.is_wrapped());
 
     // Capture content digest
-    let content_digest = content_wrapped.digest().into_owned();
+    let content_digest = content_wrapped.digest();
 
     // ═══════════════════════════════════════════════════════════════════════
     // STEP 3: Initialize Provenance Mark Chain
@@ -87,7 +87,7 @@ fn test_complete_demo_workflow() {
 
     let date = Date::from_string("2025-10-01").unwrap();
 
-    let genesis_mark = pm_gen.next(date.clone(), Some(content_digest));
+    let genesis_mark = pm_gen.next(date, Some(content_digest));
 
     // Validate provenance mark includes info
     assert!(genesis_mark.info().is_some());
@@ -172,12 +172,13 @@ fn test_complete_demo_workflow() {
         if let PublicKeyPermit::Decode { sealed, member_xid } = permit {
             // Check if this is Alice's permit
             if member_xid == &Some(alice_xid.xid())
-                && let Ok(plaintext) = sealed.decrypt(&alice_prvkeys) {
-                    let key =
-                        SymmetricKey::from_tagged_cbor_data(plaintext).unwrap();
-                    content_key = Some(key);
-                    break;
-                }
+                && let Ok(plaintext) = sealed.decrypt(&alice_prvkeys)
+            {
+                let key =
+                    SymmetricKey::from_tagged_cbor_data(plaintext).unwrap();
+                content_key = Some(key);
+                break;
+            }
         }
     }
 
@@ -227,7 +228,7 @@ fn test_complete_demo_workflow() {
     let update_wrapped = update_clear.wrap();
 
     // Capture updated content digest
-    let update_digest = update_wrapped.digest().into_owned();
+    let update_digest = update_wrapped.digest();
 
     // Advance provenance chain
     let second_mark = pm_gen.next(date, Some(update_digest));
@@ -359,7 +360,7 @@ fn test_edition_without_sskr() {
     );
 
     let content = Envelope::new("Test content").wrap();
-    let content_digest = content.digest().into_owned();
+    let content_digest = content.digest();
 
     let mut pm_gen = ProvenanceMarkGenerator::new_with_passphrase(
         ProvenanceMarkResolution::Low,
@@ -412,7 +413,7 @@ fn test_wrong_permit_key() {
     let bob_prvkeys = fixed_key(0xB3);
 
     let content = Envelope::new("Secret").wrap();
-    let content_digest = content.digest().into_owned();
+    let content_digest = content.digest();
 
     let mut pm_gen = ProvenanceMarkGenerator::new_with_passphrase(
         ProvenanceMarkResolution::Low,
@@ -437,9 +438,10 @@ fn test_wrong_permit_key() {
     let mut bob_succeeded = false;
     for permit in &edition_rt.permits {
         if let PublicKeyPermit::Decode { sealed, .. } = permit
-            && sealed.decrypt(&bob_prvkeys).is_ok() {
-                bob_succeeded = true;
-            }
+            && sealed.decrypt(&bob_prvkeys).is_ok()
+        {
+            bob_succeeded = true;
+        }
     }
 
     assert!(!bob_succeeded, "Bob should not decrypt Alice's permit");
@@ -459,7 +461,7 @@ fn test_wrong_signature_verification() {
     let wrong_prvkeys = fixed_key(0x00);
 
     let content = Envelope::new("Content").wrap();
-    let content_digest = content.digest().into_owned();
+    let content_digest = content.digest();
 
     let mut pm_gen = ProvenanceMarkGenerator::new_with_passphrase(
         ProvenanceMarkResolution::Low,
@@ -494,7 +496,7 @@ fn test_multiple_sskr_groups() {
     );
 
     let content = Envelope::new("Multi-group content").wrap();
-    let content_digest = content.digest().into_owned();
+    let content_digest = content.digest();
 
     let mut pm_gen = ProvenanceMarkGenerator::new_with_passphrase(
         ProvenanceMarkResolution::Low,
@@ -549,7 +551,7 @@ fn test_provenance_info_matches_content_digest() {
     );
 
     let content = Envelope::new("Test content").wrap();
-    let content_digest = content.digest().into_owned();
+    let content_digest = content.digest();
 
     let mut pm_gen = ProvenanceMarkGenerator::new_with_passphrase(
         ProvenanceMarkResolution::Low,
@@ -558,7 +560,7 @@ fn test_provenance_info_matches_content_digest() {
     let date = Date::from_string("2025-10-01").unwrap();
 
     // Create mark with correct content digest in info field
-    let correct_mark = pm_gen.next(date.clone(), Some(content_digest.clone()));
+    let correct_mark = pm_gen.next(date, Some(content_digest));
 
     // Verify the mark contains the digest
     assert!(correct_mark.info().is_some());
@@ -597,7 +599,7 @@ fn test_provenance_info_mismatch_content_digest() {
 
     // Create a different content to get a different digest
     let wrong_content = Envelope::new("Wrong content").wrap();
-    let wrong_digest = wrong_content.digest().into_owned();
+    let wrong_digest = wrong_content.digest();
 
     let mut pm_gen = ProvenanceMarkGenerator::new_with_passphrase(
         ProvenanceMarkResolution::Low,
@@ -606,7 +608,7 @@ fn test_provenance_info_mismatch_content_digest() {
     let date = Date::from_string("2025-10-01").unwrap();
 
     // Create mark with WRONG content digest in info field
-    let wrong_mark = pm_gen.next(date, Some(wrong_digest.clone()));
+    let wrong_mark = pm_gen.next(date, Some(wrong_digest));
 
     // Now that Edition::new validates the digest, this should FAIL
     let edition =
@@ -629,7 +631,7 @@ fn test_provenance_info_mismatch_content_digest() {
     if let Some(info_cbor) = wrong_mark.info() {
         let info_digest =
             bc_components::Digest::from_tagged_cbor(info_cbor).unwrap();
-        let content_digest = content.digest().into_owned();
+        let content_digest = content.digest();
         assert_ne!(
             info_digest, content_digest,
             "Digest in provenance info does not match actual content digest"
@@ -694,14 +696,14 @@ fn test_edition_sequence_with_digest_validation() {
 
     // First edition with correct digest
     let content1 = Envelope::new("First edition").wrap();
-    let digest1 = content1.digest().into_owned();
-    let mark1 = pm_gen.next(date.clone(), Some(digest1));
+    let digest1 = content1.digest();
+    let mark1 = pm_gen.next(date, Some(digest1));
     let edition1 = Edition::new(publisher_xid.xid(), mark1, content1).unwrap();
 
     // Second edition with correct digest
     let content2 = Envelope::new("Second edition").wrap();
-    let digest2 = content2.digest().into_owned();
-    let mark2 = pm_gen.next(date.clone(), Some(digest2));
+    let digest2 = content2.digest();
+    let mark2 = pm_gen.next(date, Some(digest2));
     let edition2 = Edition::new(publisher_xid.xid(), mark2, content2).unwrap();
 
     // Verify sequence

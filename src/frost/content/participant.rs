@@ -1,7 +1,7 @@
 use bc_components::{ARID, XID};
+use frost::rand_core::OsRng;
 use frost_secp256k1_tr as frost;
 use k256::{ProjectivePoint, Scalar};
-use rand_core::OsRng;
 
 use super::{
     commitment::FrostContentCommitment,

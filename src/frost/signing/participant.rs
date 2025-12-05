@@ -3,9 +3,9 @@ use std::collections::BTreeMap;
 use bc_components::{ARID, DigestProvider, XID};
 use frost_secp256k1_tr::{
     self as frost, Identifier,
+    rand_core::OsRng,
     round1::{NonceCommitment, SigningCommitments},
 };
-use rand::rngs::OsRng;
 
 use crate::{
     Error, Result,
@@ -87,7 +87,7 @@ impl FrostSigningParticipant {
         // Derive message digest from the package's message Envelope subject
         let subj_env = signing_pkg.message.subject();
         let msg_digest = subj_env.digest();
-        let msg_bytes: &[u8] = msg_digest.as_ref().as_ref();
+        let msg_bytes: &[u8] = msg_digest.as_ref();
         let frost_sp = frost::SigningPackage::new(frost_commitments, msg_bytes);
 
         let share = frost::round2::sign(&frost_sp, nonces, self.key_package())

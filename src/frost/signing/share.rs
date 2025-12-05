@@ -24,7 +24,7 @@ impl From<FrostSignatureShare> for Envelope {
 impl TryFrom<Envelope> for FrostSignatureShare {
     type Error = Error;
     fn try_from(envelope: Envelope) -> Result<Self> {
-        envelope.check_type_envelope("FrostSignatureShare")?;
+        envelope.check_type("FrostSignatureShare")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {

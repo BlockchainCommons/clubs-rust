@@ -63,7 +63,7 @@ impl TryFrom<Envelope> for FrostPmSigningPackage {
     type Error = Error;
 
     fn try_from(envelope: Envelope) -> Result<Self> {
-        envelope.check_type_envelope("FrostPmSigningPackage")?;
+        envelope.check_type("FrostPmSigningPackage")?;
         let subj_env = envelope.subject();
         let kv = subj_env.try_known_value()?;
         if kv.value() != known_values::UNIT.value() {
@@ -86,7 +86,7 @@ impl TryFrom<Envelope> for FrostPmSigningPackage {
                 && name == "lambda"
             {
                 let obj_env = assertion.try_object()?;
-                obj_env.check_type_envelope("FrostPmLambdaFactor")?;
+                obj_env.check_type("FrostPmLambdaFactor")?;
                 let obj_subj = obj_env.subject();
                 let obj_kv = obj_subj.try_known_value()?;
                 if obj_kv.value() != known_values::UNIT.value() {

@@ -3,11 +3,11 @@ use std::collections::BTreeMap;
 use bc_components::{SchnorrPublicKey, SigningPublicKey, XID};
 use dcbor::prelude::*;
 use frost_secp256k1_tr::{self as frost, Identifier};
+use frost::rand_core::OsRng;
 use k256::{
     AffinePoint, EncodedPoint, FieldBytes, ProjectivePoint, Scalar,
     elliptic_curve::{PrimeField, sec1::FromEncodedPoint},
 };
-use rand::rngs::OsRng; // ByteString
 
 use crate::{Error, Result, frost::participant_core::FrostParticipantCore};
 

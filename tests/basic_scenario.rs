@@ -48,7 +48,7 @@ fn basic_scenario_alice_bob_charlie() {
         .wrap();
 
     // Wrap content before getting digest
-    let content_digest = content.digest().into_owned();
+    let content_digest = content.digest();
 
     // Provenance (deterministic).
     let mut pm_gen = ProvenanceMarkGenerator::new_with_passphrase(

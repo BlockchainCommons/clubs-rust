@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use bc_components::{Digest, PrivateKeyBase, XIDProvider};
-use bc_xid::{XIDGenesisMarkOptions, XIDInceptionKeyOptions, XIDDocument};
+use bc_xid::{XIDDocument, XIDGenesisMarkOptions, XIDInceptionKeyOptions};
 use clubs::frost::{
     FrostGroup, FrostParticipantCore,
     content::{
@@ -30,7 +30,7 @@ fn run_content_ceremony(
     group: &FrostGroup,
     participants: &mut BTreeMap<bc_components::XID, FrostContentParticipant>,
     roster: &[bc_components::XID],
-    digest: &Digest,
+    digest: Digest,
 ) -> FrostContentKey {
     use clubs::frost::content::CONTENT_MESSAGE_PREFIX;
 
@@ -108,14 +108,14 @@ fn content_key_deterministic_and_roster_invariant() {
     let mut part_b = content_participants(&participant_cores);
     let mut part_a_again = content_participants(&participant_cores);
 
-    let key_a = run_content_ceremony(&group, &mut part_a, &roster_a, &digest);
+    let key_a = run_content_ceremony(&group, &mut part_a, &roster_a, digest);
     key_a.verify(&group).unwrap();
 
-    let key_b = run_content_ceremony(&group, &mut part_b, &roster_b, &digest);
+    let key_b = run_content_ceremony(&group, &mut part_b, &roster_b, digest);
     key_b.verify(&group).unwrap();
 
     let key_a_again =
-        run_content_ceremony(&group, &mut part_a_again, &roster_a, &digest);
+        run_content_ceremony(&group, &mut part_a_again, &roster_a, digest);
     key_a_again.verify(&group).unwrap();
 
     assert_eq!(key_a.key, key_b.key);
