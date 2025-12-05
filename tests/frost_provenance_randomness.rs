@@ -16,7 +16,7 @@ fn dealer_keygen(
     BTreeMap<frost::Identifier, frost::keys::KeyPackage>,
     frost::keys::PublicKeyPackage,
 ) {
-    let rng = rand::rngs::OsRng;
+    let rng = frost::rand_core::OsRng;
     let (shares, pubkeys) = frost::keys::generate_with_dealer(
         n,
         t,
