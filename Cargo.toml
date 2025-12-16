@@ -12,13 +12,13 @@ keywords = ["encoding", "cbor", "binary", "format", "publishing"] # Up to five
 categories = ["data-structures", "encoding"]                      # https://crates.io/category_slugs
 
 [dependencies]
-provenance-mark = "^0.17.0"
-dcbor = "^0.24.0"
-bc-ur = "^0.17.0"
-bc-envelope = "^0.38.0"
-bc-xid = "^0.17.0"
-bc-components = "^0.29.0"
-known-values = "^0.12.0"
+provenance-mark = "^0.18.0"
+dcbor = "^0.24.1"
+bc-ur = "^0.18.0"
+bc-envelope = "^0.39.0"
+bc-xid = "^0.18.0"
+bc-components = "^0.30.0"
+known-values = "^0.13.0"
 rand = "^0.9.2"
 k256 = { version = "^0.13.4", features = ["arithmetic", "hash2curve"] }
 sha2 = "^0.10.9"
