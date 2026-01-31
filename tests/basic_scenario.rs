@@ -80,6 +80,7 @@ fn basic_scenario_alice_bob_charlie() {
     // below. println!("{}", sealed.format());
 
     // Phase Two: test against expected output.
+    // expected-text-output-rubric:
     #[rustfmt::skip]
     let expected = (indoc! {r#"
         {
@@ -109,6 +110,7 @@ fn basic_scenario_alice_bob_charlie() {
     "#}).trim();
     assert_eq!(sealed.format(), expected);
 
+    // expected-text-output-rubric:
     #[rustfmt::skip]
     let expected = (indoc! {r#"
         ENCRYPTED [
@@ -122,6 +124,7 @@ fn basic_scenario_alice_bob_charlie() {
     let edition_rt =
         Edition::unseal(sealed.clone(), &club_k.public_keys()).unwrap();
     let roundtrip_env: Envelope = edition_rt.clone().into();
+    // expected-text-output-rubric:
     #[rustfmt::skip]
     let expected_rt = (indoc! {r#"
         ENCRYPTED [

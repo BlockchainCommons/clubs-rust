@@ -91,6 +91,7 @@ fn frost_two_of_three_signs_envelope_and_verify() {
     // message
     let signed_envelope = coordinator.finalize().unwrap();
 
+    // expected-text-output-rubric:
     #[rustfmt::skip]
     let expected = (indoc! {r#"
         {
